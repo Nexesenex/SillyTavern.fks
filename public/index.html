@@ -281,15 +281,15 @@
                                 </div>
                                 <div id="max_context_block" class="alignitemscenter flex-container marginBot5 flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
                                     <small data-i18n="context size(tokens)">Context (tokens)</small>
-                                    <input class="neo-range-slider" type="range" id="max_context" name="volume" min="512" max="8192" step="64">
+                                    <input class="neo-range-slider" type="range" id="max_context" name="volume" min="256" max="32768" step="256">
                                     <div data-randomization-disabled="true" class="wide100p">
-                                        <input class="neo-range-input" type="number" min="512" max="8192" step="64" data-for="max_context" id="max_context_counter">
+                                        <input class="neo-range-input" type="number" min="256" max="32768" step="256" data-for="max_context" id="max_context_counter">
                                     </div>
                                     <div class="flex-container alignitemscenter justifyCenter marginTop5" id="max_context_unlocked_block">
                                         <label class="checkbox_label">
                                             <input id="max_context_unlocked" type="checkbox" />
                                             <small><span data-i18n="unlocked">Unlocked</span>
-                                                <div id="max_context_unlocked_warning" class="fa-solid fa-circle-info opacity50p " data-i18n="[title]Only enable this if your model supports context sizes greater than 8192 tokens" title="Only enable this if your model supports context sizes greater than 8192 tokens.&#13;Increase only if you know what you're doing."></div>
+                                                <div id="max_context_unlocked_warning" class="fa-solid fa-circle-info opacity50p " data-i18n="[title]Only enable this if your model supports context sizes greater than 32768 tokens" title="Only enable this if your model supports context sizes greater than 8192 tokens.&#13;Increase only if you know what you're doing."></div>
                                             </small>
                                         </label>
                                     </div>
