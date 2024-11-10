@@ -67,13 +67,13 @@ export {
     applyPowerUserSettings,
 };
 
-export const MAX_CONTEXT_DEFAULT = 8192;
+export const MAX_CONTEXT_DEFAULT = 32768;
 export const MAX_RESPONSE_DEFAULT = 2048;
-const MAX_CONTEXT_UNLOCKED = 200 * 1024;
+const MAX_CONTEXT_UNLOCKED = 128 * 2048;
 const MAX_RESPONSE_UNLOCKED = 16 * 1024;
-const unlockedMaxContextStep = 512;
-const maxContextMin = 512;
-const maxContextStep = 64;
+const unlockedMaxContextStep = 128;
+const maxContextMin = 128;
+const maxContextStep = 128;
 
 const defaultStoryString = '{{#if system}}{{system}}\n{{/if}}{{#if description}}{{description}}\n{{/if}}{{#if personality}}{{char}}\'s personality: {{personality}}\n{{/if}}{{#if scenario}}Scenario: {{scenario}}\n{{/if}}{{#if persona}}{{persona}}\n{{/if}}';
 const defaultExampleSeparator = '***';
