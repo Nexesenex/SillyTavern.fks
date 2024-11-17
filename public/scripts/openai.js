@@ -3613,7 +3613,7 @@ async function onExportPresetClick() {
     const fieldValues = sensitiveFields.filter(field => preset[field]).map(field => `<b>${field}</b>: <code>${preset[field]}</code>`);
     const shouldConfirm = fieldValues.length > 0;
     const textHeader = t`Your preset contains proxy and/or custom endpoint settings.`;
-    const textMessage = `<div>` + t`Do you want to remove these fields before exporting?` + `</div><br>${DOMPurify.sanitize(fieldValues.join('<br>'))}`;
+    const textMessage = '<div>' + t`Do you want to remove these fields before exporting?` + `</div><br>${DOMPurify.sanitize(fieldValues.join('<br>'))}`;
     const cancelButton = { text: 'Cancel', result: POPUP_RESULT.CANCELLED, appendAtEnd: true };
     const popupOptions = { customButtons: [cancelButton] };
     const popupResult = await Popup.show.confirm(textHeader, textMessage, popupOptions);
@@ -4056,6 +4056,8 @@ async function onModelChange() {
     if (oai_settings.chat_completion_source == chat_completion_sources.MAKERSUITE) {
         if (oai_settings.max_context_unlocked) {
             $('#openai_max_context').attr('max', max_2mil);
+        } else if (value.includes('gemini-exp-1114')){
+            $('#openai_max_context').attr('max', max_32k);
         } else if (value.includes('gemini-1.5-pro')) {
             $('#openai_max_context').attr('max', max_2mil);
         } else if (value.includes('gemini-1.5-flash')) {
@@ -4370,7 +4372,7 @@ async function onOpenrouterModelSortChange() {
 async function onNewPresetClick() {
     const popupText = `
         <h3>` + t`Preset name:` + `</h3>
-        <h4>` + t`Hint: Use a character/group name to bind preset to a specific chat.` + `</h4>`;
+        <h4>` + t`Hint: Use a character/group name to bind preset to a specific chat.` + '</h4>';
     const name = await callPopup(popupText, 'input', oai_settings.preset_settings_openai);
 
     if (!name) {
@@ -4742,6 +4744,7 @@ export function isImageInliningSupported() {
         'gemini-1.5-flash-8b',
         'gemini-1.5-flash-8b-exp-0827',
         'gemini-1.5-flash-8b-exp-0924',
+        'gemini-exp-1114',
         'gemini-1.0-pro-vision-latest',
         'gemini-1.5-pro',
         'gemini-1.5-pro-latest',
