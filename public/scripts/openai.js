@@ -752,7 +752,8 @@ async function populateChatHistory(messages, prompts, chatCompletion, type = nul
             if (type === 'continue' && oai_settings.continue_prefill && chatPrompt === firstNonInjected) {
                 // in case we are using continue_prefill and the latest message is an assistant message, we want to prepend the users assistant prefill on the message
                 if (chatPrompt.role === 'assistant') {
-                    const continueMessage = await Message.createAsync(chatMessage.role, substituteParams(oai_settings.assistant_prefill + '\n\n') + chatMessage.content, chatMessage.identifier);
+                    const messageContent = [substituteParams(oai_settings.assistant_prefill), chatMessage.content].filter(x => x).join('\n\n');
+                    const continueMessage = await Message.createAsync(chatMessage.role, messageContent, chatMessage.identifier);
                     const collection = new MessageCollection('continuePrefill', continueMessage);
                     chatCompletion.add(collection, -1);
                     continue;
@@ -1312,6 +1313,11 @@ export async function prepareOpenAIMessages({
     return [chat, promptManager.tokenHandler.counts];
 }
 
+/**
+ * Handles errors during streaming requests.
+ * @param {Response} response
+ * @param {string} decoded - response text or decoded stream data
+ */
 function tryParseStreamingError(response, decoded) {
     try {
         const data = JSON.parse(decoded);
@@ -1322,6 +1328,9 @@ function tryParseStreamingError(response, decoded) {
 
         checkQuotaError(data);
         checkModerationError(data);
+
+        // these do not throw correctly (equiv to Error("[object Object]"))
+        // if trying to fix "[object Object]" displayed to users, start here
 
         if (data.error) {
             toastr.error(data.error.message || response.statusText, 'Chat Completion API');
@@ -1338,15 +1347,22 @@ function tryParseStreamingError(response, decoded) {
     }
 }
 
-async function checkQuotaError(data) {
-    const errorText = await renderTemplateAsync('quotaError');
-
+/**
+ * Checks if the response contains a quota error and displays a popup if it does.
+ * @param data
+ * @returns {void}
+ * @throws {object} - response JSON
+ */
+function checkQuotaError(data) {
     if (!data) {
         return;
     }
 
     if (data.quota_error) {
-        callPopup(errorText, 'text');
+        renderTemplateAsync('quotaError').then((html) => Popup.show.text('Quota Error', html));
+
+        // this does not throw correctly (equiv to Error("[object Object]"))
+        // if trying to fix "[object Object]" displayed to users, start here
         throw new Error(data);
     }
 }
@@ -1765,6 +1781,15 @@ async function sendAltScaleRequest(messages, logit_bias, signal, type) {
     return data.output;
 }
 
+/**
+ * Send a chat completion request to backend
+ * @param {string} type (impersonate, quiet, continue, etc)
+ * @param {Array} messages
+ * @param {AbortSignal?} signal
+ * @returns {Promise<unknown>}
+ * @throws {Error}
+ */
+
 async function sendOpenAIRequest(type, messages, signal) {
     // Provide default abort signal
     if (!signal) {
@@ -2027,12 +2052,13 @@ async function sendOpenAIRequest(type, messages, signal) {
     else {
         const data = await response.json();
 
-        await checkQuotaError(data);
+        checkQuotaError(data);
         checkModerationError(data);
 
         if (data.error) {
-            toastr.error(data.error.message || response.statusText, t`API returned an error`);
-            throw new Error(data);
+            const message = data.error.message || response.statusText || t`Unknown error`;
+            toastr.error(message, t`API returned an error`);
+            throw new Error(message);
         }
 
         if (type !== 'quiet') {
