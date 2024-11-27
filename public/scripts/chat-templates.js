@@ -53,6 +53,12 @@ const hash_derivations = {
         // command-r-08-2024
         'Command R'
     ,
+
+    // Tulu
+    'ac7498a36a719da630e99d48e6ebc4409de85a77556c2b6159eeb735bcbd11df':
+        // Tulu-3-8B
+        // Tulu-3-70B
+        'Tulu'
 };
 
 const substr_derivations = {
@@ -65,6 +71,11 @@ const parse_derivation = derivation => (typeof derivation === 'string') ? {
 } : derivation;
 
 export async function deriveTemplatesFromChatTemplate(chat_template, hash) {
+    if (chat_template.trim() === '') {
+        console.log('Missing chat template.');
+        return null;
+    }
+
     if (hash in hash_derivations) {
         return parse_derivation(hash_derivations[hash]);
     }
