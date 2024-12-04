@@ -1268,6 +1268,7 @@ export function getTextGenGenerationData(finalPrompt, maxTokens, isImpersonate, 
 
     if (settings.type === KOBOLDCPP) {
         params.grammar = settings.grammar_string;
+        params.trim_stop = true;
     }
 
     if (settings.type === HUGGINGFACE) {
@@ -1339,6 +1340,9 @@ export function getTextGenGenerationData(finalPrompt, maxTokens, isImpersonate, 
             'dry_sequence_breakers': sequenceBreakers,
         };
         params = Object.assign(params, llamaCppParams);
+        if (!Array.isArray(sequenceBreakers) || sequenceBreakers.length === 0) {
+            delete params.dry_sequence_breakers;
+        }
     }
 
     eventSource.emitAndWait(event_types.TEXT_COMPLETION_SETTINGS_READY, params);
