@@ -5,14 +5,15 @@
 import { Buffer } from 'node:buffer';
 import storage from 'node-persist';
 import { getAllUserHandles, toKey, getPasswordHash } from '../users.js';
-import { getConfig, getConfigValue } from '../util.js';
+import { getConfig, getConfigValue, safeReadFileSync } from '../util.js';
 
 const PER_USER_BASIC_AUTH = getConfigValue('perUserBasicAuth', false);
 const ENABLE_ACCOUNTS = getConfigValue('enableUserAccounts', false);
 
+const unauthorizedWebpage = safeReadFileSync('./public/error/unauthorized.html') ?? '';
 const unauthorizedResponse = (res) => {
     res.set('WWW-Authenticate', 'Basic realm="SillyTavern", charset="UTF-8"');
-    return res.status(401).send('Authentication required');
+    return res.status(401).send(unauthorizedWebpage);
 };
 
 const basicAuthMiddleware = async function (request, response, callback) {
