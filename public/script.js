@@ -724,6 +724,7 @@ async function getSystemMessages() {
             is_user: false,
             is_system: true,
             mes: await renderTemplateAsync('assistantNote'),
+            uses_system_ui: true,
             extra: {
                 isSmallSys: true,
             },
