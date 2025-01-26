@@ -10,13 +10,13 @@ import { getConfig, getConfigValue, safeReadFileSync } from '../util.js';
 const PER_USER_BASIC_AUTH = getConfigValue('perUserBasicAuth', false);
 const ENABLE_ACCOUNTS = getConfigValue('enableUserAccounts', false);
 
-const unauthorizedWebpage = safeReadFileSync('./public/error/unauthorized.html') ?? '';
-const unauthorizedResponse = (res) => {
-    res.set('WWW-Authenticate', 'Basic realm="SillyTavern", charset="UTF-8"');
-    return res.status(401).send(unauthorizedWebpage);
-};
-
 const basicAuthMiddleware = async function (request, response, callback) {
+    const unauthorizedWebpage = safeReadFileSync('./public/error/unauthorized.html') ?? '';
+    const unauthorizedResponse = (res) => {
+        res.set('WWW-Authenticate', 'Basic realm="SillyTavern", charset="UTF-8"');
+        return res.status(401).send(unauthorizedWebpage);
+    };
+
     const config = getConfig();
     const authHeader = request.headers.authorization;
 

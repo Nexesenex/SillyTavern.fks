@@ -11,9 +11,6 @@ const whitelistPath = path.join(process.cwd(), './whitelist.txt');
 const enableForwardedWhitelist = getConfigValue('enableForwardedWhitelist', false);
 let whitelist = getConfigValue('whitelist', []);
 let knownIPs = new Set();
-const forbiddenWebpage = Handlebars.compile(
-    safeReadFileSync('./public/error/forbidden-by-whitelist.html') ?? '',
-);
 
 if (fs.existsSync(whitelistPath)) {
     try {
@@ -56,6 +53,10 @@ function getForwardedIp(req) {
  * @returns {import('express').RequestHandler} The middleware function
  */
 export default function whitelistMiddleware(whitelistMode, listen) {
+    const forbiddenWebpage = Handlebars.compile(
+        safeReadFileSync('./public/error/forbidden-by-whitelist.html') ?? '',
+    );
+
     return function (req, res, next) {
         const clientIp = getIpFromRequest(req);
         const forwardedIp = getForwardedIp(req);
