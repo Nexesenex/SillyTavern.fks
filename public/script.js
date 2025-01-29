@@ -1993,9 +1993,10 @@ export async function sendTextareaMessage() {
  * @param {boolean} isUser If the message was sent by the user
  * @param {number} messageId Message index in chat array
  * @param {object} [sanitizerOverrides] DOMPurify sanitizer option overrides
+ * @param {boolean} [isReasoning] If the message is reasoning output
  * @returns {string} HTML string
  */
-export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, sanitizerOverrides = {}) {
+export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, sanitizerOverrides = {}, isReasoning = false) {
     if (!mes) {
         return '';
     }
@@ -2029,6 +2030,9 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
     if (!isSystem) {
         function getRegexPlacement() {
             try {
+                if (isReasoning) {
+                    return regex_placement.REASONING;
+                }
                 if (isUser) {
                     return regex_placement.USER_INPUT;
                 } else if (chat[messageId]?.extra?.type === 'narrator') {
@@ -2250,8 +2254,8 @@ function getMessageFromTemplate({
 export function updateMessageBlock(messageId, message) {
     const messageElement = $(`#chat [mesid="${messageId}"]`);
     const text = message?.extra?.display_text ?? message.mes;
-    messageElement.find('.mes_text').html(messageFormatting(text, message.name, message.is_system, message.is_user, messageId));
-    messageElement.find('.mes_reasoning').html(messageFormatting(message.extra?.reasoning ?? '', '', false, false, -1));
+    messageElement.find('.mes_text').html(messageFormatting(text, message.name, message.is_system, message.is_user, messageId, {}, false));
+    messageElement.find('.mes_reasoning').html(messageFormatting(message.extra?.reasoning ?? '', '', false, false, messageId, {}, true));
     addCopyToCodeBlocks(messageElement);
     appendMediaToMessage(message, messageElement);
 }
@@ -2408,9 +2412,10 @@ export function addOneMessage(mes, { type = 'normal', insertAfter = null, scroll
         mes.is_user,
         chat.indexOf(mes),
         sanitizerOverrides,
+        false,
     );
-    const bias = messageFormatting(mes.extra?.bias ?? '', '', false, false, -1);
-    const reasoning = messageFormatting(mes.extra?.reasoning ?? '', '', false, false, -1);
+    const bias = messageFormatting(mes.extra?.bias ?? '', '', false, false, -1, {}, false);
+    const reasoning = messageFormatting(mes.extra?.reasoning ?? '', '', false, false, chat.indexOf(mes), {}, true);
     let bookmarkLink = mes?.extra?.bookmark_link ?? '';
 
     let params = {
@@ -3205,7 +3210,7 @@ class StreamingProcessor {
             if (this.reasoning) {
                 chat[messageId]['extra']['reasoning'] = this.reasoning;
                 if (this.messageReasoningDom instanceof HTMLElement) {
-                    const formattedReasoning = messageFormatting(this.reasoning, '', false, false, -1);
+                    const formattedReasoning = messageFormatting(this.reasoning, '', false, false, messageId, {}, true);
                     this.messageReasoningDom.innerHTML = formattedReasoning;
                 }
             }
@@ -3232,6 +3237,8 @@ class StreamingProcessor {
                 chat[messageId].is_system,
                 chat[messageId].is_user,
                 messageId,
+                {},
+                false,
             );
             if (this.messageTextDom instanceof HTMLElement) {
                 this.messageTextDom.innerHTML = formattedText;
@@ -3383,7 +3390,7 @@ class StreamingProcessor {
                 if (logprobs) {
                     this.messageLogprobs.push(...(Array.isArray(logprobs) ? logprobs : [logprobs]));
                 }
-                this.reasoning = state?.reasoning ?? '';
+                this.reasoning = getRegexedString(state?.reasoning ?? '', regex_placement.REASONING);
                 await eventSource.emit(event_types.STREAM_TOKEN_RECEIVED, text);
                 await sw.tick(() => this.onProgressStreaming(this.messageId, this.continueMessage + text));
             }
@@ -3850,14 +3857,6 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         coreChat.pop();
     }
 
-    const reasoning = new PromptReasoning();
-    for (let i = coreChat.length - 1; i >= 0; i--) {
-        if (reasoning.isLimitReached()) {
-            break;
-        }
-        coreChat[i] = { ...coreChat[i], mes: reasoning.addToMessage(coreChat[i].mes, coreChat[i].extra?.reasoning) };
-    }
-
     coreChat = await Promise.all(coreChat.map(async (chatItem, index) => {
         let message = chatItem.mes;
         let regexType = chatItem.is_user ? regex_placement.USER_INPUT : regex_placement.AI_OUTPUT;
@@ -3876,6 +3875,25 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             index,
         };
     }));
+
+    const reasoning = new PromptReasoning();
+    for (let i = coreChat.length - 1; i >= 0; i--) {
+        if (reasoning.isLimitReached()) {
+            break;
+        }
+        const depth = coreChat.length - i - 1;
+        coreChat[i] = {
+            ...coreChat[i],
+            mes: reasoning.addToMessage(
+                coreChat[i].mes,
+                getRegexedString(
+                    String(coreChat[i].extra?.reasoning ?? ''),
+                    regex_placement.REASONING,
+                    { isPrompt: true, depth: depth },
+                ),
+            ),
+        };
+    }
 
     // Determine token limit
     let this_max_context = getMaxContextSize();
@@ -4785,6 +4803,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         const swipes = extractMultiSwipes(data, type);
 
         messageChunk = cleanUpMessage(getMessage, isImpersonate, isContinue, false);
+        reasoning = getRegexedString(reasoning, regex_placement.REASONING);
 
         if (isContinue) {
             getMessage = continue_mag + getMessage;
@@ -7190,9 +7209,11 @@ function messageEditAuto(div) {
         mes.is_system,
         mes.is_user,
         this_edit_mes_id,
+        {},
+        false,
     ));
     mesBlock.find('.mes_bias').empty();
-    mesBlock.find('.mes_bias').append(messageFormatting(bias, '', false, false, -1));
+    mesBlock.find('.mes_bias').append(messageFormatting(bias, '', false, false, -1, {}, false));
     saveChatDebounced();
 }
 
@@ -7214,10 +7235,12 @@ async function messageEditDone(div) {
             mes.is_system,
             mes.is_user,
             this_edit_mes_id,
+            {},
+            false,
         ),
     );
     mesBlock.find('.mes_bias').empty();
-    mesBlock.find('.mes_bias').append(messageFormatting(bias, '', false, false, -1));
+    mesBlock.find('.mes_bias').append(messageFormatting(bias, '', false, false, -1, {}, false));
     appendMediaToMessage(mes, div.closest('.mes'));
     addCopyToCodeBlocks(div.closest('.mes'));
 
@@ -10860,6 +10883,8 @@ jQuery(async function () {
                 chat[this_edit_mes_id].is_system,
                 chat[this_edit_mes_id].is_user,
                 this_edit_mes_id,
+                {},
+                false,
             ));
         appendMediaToMessage(chat[this_edit_mes_id], $(this).closest('.mes'));
         addCopyToCodeBlocks($(this).closest('.mes'));
