@@ -95,6 +95,7 @@ import {
     resetMovableStyles,
     forceCharacterEditorTokenize,
     applyPowerUserSettings,
+    generatedTextFiltered,
 } from './scripts/power-user.js';
 
 import {
@@ -3290,39 +3291,11 @@ class StreamingProcessor {
         unblockGeneration();
         generatedPromptCache = '';
 
-        //console.log("Generated text size:", text.length, text)
-
         const isAborted = this.abortController.signal.aborted;
-        if (power_user.auto_swipe && !isAborted) {
-            function containsBlacklistedWords(str, blacklist, threshold) {
-                const regex = new RegExp(`\\b(${blacklist.join('|')})\\b`, 'gi');
-                const matches = str.match(regex) || [];
-                return matches.length >= threshold;
-            }
-
-            const generatedTextFiltered = (text) => {
-                if (text) {
-                    if (power_user.auto_swipe_minimum_length) {
-                        if (text.length < power_user.auto_swipe_minimum_length && text.length !== 0) {
-                            console.log('Generated text size too small');
-                            return true;
-                        }
-                    }
-                    if (power_user.auto_swipe_blacklist_threshold) {
-                        if (containsBlacklistedWords(text, power_user.auto_swipe_blacklist, power_user.auto_swipe_blacklist_threshold)) {
-                            console.log('Generated text has blacklisted words');
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            };
-
-            if (generatedTextFiltered(text)) {
-                swipe_right();
-                return;
-            }
+        if (!isAborted && power_user.auto_swipe && generatedTextFiltered(text)) {
+            return swipe_right();
         }
+
         playMessageSound();
     }
 
@@ -4862,32 +4835,9 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         }
 
         const isAborted = abortController && abortController.signal.aborted;
-        if (power_user.auto_swipe && !isAborted) {
-            console.debug('checking for autoswipeblacklist on non-streaming message');
-            function containsBlacklistedWords(getMessage, blacklist, threshold) {
-                console.debug('checking blacklisted words');
-                const regex = new RegExp(`\\b(${blacklist.join('|')})\\b`, 'gi');
-                const matches = getMessage.match(regex) || [];
-                return matches.length >= threshold;
-            }
-
-            const generatedTextFiltered = (getMessage) => {
-                if (power_user.auto_swipe_blacklist_threshold) {
-                    if (containsBlacklistedWords(getMessage, power_user.auto_swipe_blacklist, power_user.auto_swipe_blacklist_threshold)) {
-                        console.debug('Generated text has blacklisted words');
-                        return true;
-                    }
-                }
-
-                return false;
-            };
-            if (generatedTextFiltered(getMessage)) {
-                console.debug('swiping right automatically');
-                is_send_press = false;
-                swipe_right();
-                // TODO: do we want to resolve after an auto-swipe?
-                return;
-            }
+        if (!isAborted && power_user.auto_swipe && generatedTextFiltered(getMessage)) {
+            is_send_press = false;
+            return swipe_right();
         }
 
         console.debug('/api/chats/save called by /Generate');

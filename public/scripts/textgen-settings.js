@@ -501,7 +501,7 @@ export function loadTextGenSettings(data, loadedSettings) {
     for (const [type, selector] of Object.entries(SERVER_INPUTS)) {
         const control = $(selector);
         control.val(settings.server_urls[type] ?? '').on('input', function () {
-            settings.server_urls[type] = String($(this).val());
+            settings.server_urls[type] = String($(this).val()).trim();
             saveSettingsDebounced();
         });
     }
