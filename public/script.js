@@ -170,6 +170,7 @@ import {
     toggleDrawer,
     isElementInViewport,
     copyText,
+    escapeHtml,
 } from './scripts/utils.js';
 import { debounce_timeout } from './scripts/constants.js';
 
@@ -2002,7 +2003,7 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         return '';
     }
 
-    if (Number(messageId) === 0 && !isSystem && !isUser) {
+    if (Number(messageId) === 0 && !isSystem && !isUser && !isReasoning) {
         const mesBeforeReplace = mes;
         const chatMessage = chat[messageId];
         mes = substituteParams(mes, undefined, ch_name);
@@ -2066,6 +2067,17 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
     if (!isSystem && power_user.encode_tags) {
         mes = mes.replaceAll('<', '&lt;').replaceAll('>', '&gt;');
     }
+
+    // Make sure reasoning strings are always shown, even if they include "<" or ">"
+    [power_user.reasoning.prefix, power_user.reasoning.suffix].forEach((reasoningString) => {
+        if (!reasoningString || !reasoningString.trim().length) {
+            return;
+        }
+        // Only replace the first occurrence of the reasoning string
+        if (mes.includes(reasoningString)) {
+            mes = mes.replace(reasoningString, escapeHtml(reasoningString));
+        }
+    });
 
     if (!isSystem) {
         // Save double quotes in tags as a special character to prevent them from being encoded
@@ -3159,7 +3171,7 @@ class StreamingProcessor {
             this.sendTextarea.dispatchEvent(new Event('input', { bubbles: true }));
         }
         else {
-            await saveReply(this.type, text, true);
+            await saveReply(this.type, text, true, '', [], '');
             messageId = chat.length - 1;
             this.#checkDomElements(messageId);
             this.showMessageButtons(messageId);
@@ -3209,7 +3221,7 @@ class StreamingProcessor {
             }
 
             if (this.reasoning) {
-                chat[messageId]['extra']['reasoning'] = this.reasoning;
+                chat[messageId]['extra']['reasoning'] = power_user.trim_spaces ? this.reasoning.trim() : this.reasoning;
                 if (this.messageReasoningDom instanceof HTMLElement) {
                     const formattedReasoning = messageFormatting(this.reasoning, '', false, false, messageId, {}, true);
                     this.messageReasoningDom.innerHTML = formattedReasoning;
@@ -3353,7 +3365,7 @@ class StreamingProcessor {
             const timestamps = [];
             for await (const { text, swipes, logprobs, toolCalls, state } of this.generator()) {
                 timestamps.push(Date.now());
-                if (this.isStopped) {
+                if (this.isStopped || this.abortController.signal.aborted) {
                     return;
                 }
 
@@ -3851,10 +3863,8 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
 
     const reasoning = new PromptReasoning();
     for (let i = coreChat.length - 1; i >= 0; i--) {
-        if (reasoning.isLimitReached()) {
-            break;
-        }
         const depth = coreChat.length - i - 1;
+        const isPrefix = isContinue && i === coreChat.length - 1;
         coreChat[i] = {
             ...coreChat[i],
             mes: reasoning.addToMessage(
@@ -3864,8 +3874,12 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                     regex_placement.REASONING,
                     { isPrompt: true, depth: depth },
                 ),
+                isPrefix,
             ),
         };
+        if (reasoning.isLimitReached()) {
+            break;
+        }
     }
 
     // Determine token limit
@@ -4778,6 +4792,10 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         messageChunk = cleanUpMessage(getMessage, isImpersonate, isContinue, false);
         reasoning = getRegexedString(reasoning, regex_placement.REASONING);
 
+        if (power_user.trim_spaces) {
+            reasoning = reasoning.trim();
+        }
+
         if (isContinue) {
             getMessage = continue_mag + getMessage;
         }
@@ -5688,15 +5706,26 @@ function extractMessageFromData(data) {
  * @returns {string} Extracted reasoning
  */
 function extractReasoningFromData(data) {
-    if (main_api === 'openai' && oai_settings.show_thoughts) {
-        switch (oai_settings.chat_completion_source) {
-            case chat_completion_sources.DEEPSEEK:
-                return data?.choices?.[0]?.message?.reasoning_content ?? '';
-            case chat_completion_sources.OPENROUTER:
-                return data?.choices?.[0]?.message?.reasoning ?? '';
-            case chat_completion_sources.MAKERSUITE:
-                return data?.responseContent?.parts?.filter(part => part.thought)?.map(part => part.text)?.join('\n\n') ?? '';
-        }
+    switch (main_api) {
+        case 'textgenerationwebui':
+            switch (textgen_settings.type) {
+                case textgen_types.OPENROUTER:
+                    return data?.choices?.[0]?.reasoning ?? '';
+            }
+            break;
+
+        case 'openai':
+            if (!oai_settings.show_thoughts) break;
+
+            switch (oai_settings.chat_completion_source) {
+                case chat_completion_sources.DEEPSEEK:
+                    return data?.choices?.[0]?.message?.reasoning_content ?? '';
+                case chat_completion_sources.OPENROUTER:
+                    return data?.choices?.[0]?.message?.reasoning ?? '';
+                case chat_completion_sources.MAKERSUITE:
+                    return data?.responseContent?.parts?.filter(part => part.thought)?.map(part => part.text)?.join('\n\n') ?? '';
+            }
+            break;
     }
 
     return '';

@@ -1587,6 +1587,10 @@
                                                 <input type="checkbox" id="skip_special_tokens_textgenerationwebui" />
                                                 <small data-i18n="Skip Special Tokens">Skip Special Tokens</small>
                                             </label>
+                                            <label data-tg-type="openrouter" class="checkbox_label flexGrow flexShrink" for="include_reasoning_textgenerationwebui">
+                                                <input type="checkbox" id="include_reasoning_textgenerationwebui" />
+                                                <small data-i18n="Request Model Reasoning">Request Model Reasoning</small>
+                                            </label>
                                             <label data-tg-type="ooba, aphrodite, tabby" class="checkbox_label  flexGrow flexShrink" for="temperature_last_textgenerationwebui">
                                                 <input type="checkbox" id="temperature_last_textgenerationwebui" />
                                                 <label>
@@ -3791,6 +3795,12 @@
                                 <span data-i18n="Reasoning">Reasoning</span>
                             </h4>
                             <div>
+                                <label class="checkbox_label" for="reasoning_auto_parse" title="Automatically parse reasoning blocks from main content between the reasoning prefix/suffix. Both fields must be defined and non-empty." data-i18n="[title]reasoning_auto_parse">
+                                    <input id="reasoning_auto_parse" type="checkbox" />
+                                    <small data-i18n="Auto-Parse Reasoning">
+                                        Auto-Parse Reasoning
+                                    </small>
+                                </label>
                                 <label class="checkbox_label" for="reasoning_add_to_prompts" title="Add existing reasoning blocks to prompts. To add a new reasoning block, use the message edit menu." data-i18n="[title]reasoning_add_to_prompts">
                                     <input id="reasoning_add_to_prompts" type="checkbox" />
                                     <small data-i18n="Add Reasoning to Prompts">

@@ -298,7 +298,7 @@ const default_settings = {
     names_behavior: character_names_behavior.DEFAULT,
     continue_postfix: continue_postfix_types.SPACE,
     custom_prompt_post_processing: custom_prompt_post_processing_types.NONE,
-    show_thoughts: false,
+    show_thoughts: true,
     seed: -1,
     n: 1,
 };
@@ -377,7 +377,7 @@ const oai_settings = {
     names_behavior: character_names_behavior.DEFAULT,
     continue_postfix: continue_postfix_types.SPACE,
     custom_prompt_post_processing: custom_prompt_post_processing_types.NONE,
-    show_thoughts: false,
+    show_thoughts: true,
     seed: -1,
     n: 1,
 };
@@ -1913,7 +1913,7 @@ async function sendOpenAIRequest(type, messages, signal) {
         'user_name': name1,
         'char_name': name2,
         'group_names': getGroupNames(),
-        'show_thoughts': Boolean(oai_settings.show_thoughts),
+        'include_reasoning': Boolean(oai_settings.show_thoughts),
     };
 
     // Empty array will produce a validation error
@@ -2151,7 +2151,7 @@ function getStreamingReply(data, state) {
         return data?.delta?.text || '';
     } else if (oai_settings.chat_completion_source === chat_completion_sources.MAKERSUITE) {
         if (oai_settings.show_thoughts) {
-            state.reasoning += (data?.candidates?.[0]?.content?.parts?.filter(x =>  x.thought)?.map(x => x.text)?.[0] || '');
+            state.reasoning += (data?.candidates?.[0]?.content?.parts?.filter(x => x.thought)?.map(x => x.text)?.[0] || '');
         }
         return data?.candidates?.[0]?.content?.parts?.filter(x => !x.thought)?.map(x => x.text)?.[0] || '';
     } else if (oai_settings.chat_completion_source === chat_completion_sources.COHERE) {
@@ -2166,7 +2166,7 @@ function getStreamingReply(data, state) {
             state.reasoning += (data.choices?.filter(x => x?.delta?.reasoning)?.[0]?.delta?.reasoning || '');
         }
         return data.choices?.[0]?.delta?.content ?? data.choices?.[0]?.message?.content ?? data.choices?.[0]?.text ?? '';
-    } else  {
+    } else {
         return data.choices?.[0]?.delta?.content ?? data.choices?.[0]?.message?.content ?? data.choices?.[0]?.text ?? '';
     }
 }
