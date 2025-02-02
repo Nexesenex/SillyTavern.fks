@@ -292,10 +292,11 @@ export function getGroupNames() {
 
 /**
  * Finds the character ID for a group member.
- * @param {string} arg 0-based member index or character name
- * @returns {number} 0-based character ID
+ * @param {number|string} arg 0-based member index or character name
+ * @param {Boolean} full Whether to return a key-value object containing extra data
+ * @returns {number|Object} 0-based character ID or key-value object if full is true
  */
-export function findGroupMemberId(arg) {
+export function findGroupMemberId(arg, full = false) {
     arg = arg?.trim();
 
     if (!arg) {
@@ -311,15 +312,19 @@ export function findGroupMemberId(arg) {
     }
 
     const index = parseInt(arg);
-    const searchByName = isNaN(index);
+    const searchByString = isNaN(index);
 
-    if (searchByName) {
-        const memberNames = group.members.map(x => ({ name: characters.find(y => y.avatar === x)?.name, index: characters.findIndex(y => y.avatar === x) }));
-        const fuse = new Fuse(memberNames, { keys: ['name'] });
+    if (searchByString) {
+        const memberNames = group.members.map(x => ({
+            avatar: x,
+            name: characters.find(y => y.avatar === x)?.name,
+            index: characters.findIndex(y => y.avatar === x),
+        }));
+        const fuse = new Fuse(memberNames, { keys: ['avatar', 'name'] });
         const result = fuse.search(arg);
 
         if (!result.length) {
-            console.warn(`WARN: No group member found with name ${arg}`);
+            console.warn(`WARN: No group member found using string ${arg}`);
             return;
         }
 
@@ -330,9 +335,11 @@ export function findGroupMemberId(arg) {
             return;
         }
 
-        console.log(`Triggering group member ${chid} (${arg}) from search result`, result[0]);
-        return chid;
-    } else {
+        console.log(`Targeting group member ${chid} (${arg}) from search result`, result[0]);
+
+        return !full ? chid : { ...{ id: chid }, ...result[0].item };
+    }
+    else {
         const memberAvatar = group.members[index];
 
         if (memberAvatar === undefined) {
@@ -347,8 +354,14 @@ export function findGroupMemberId(arg) {
             return;
         }
 
-        console.log(`Triggering group member ${memberAvatar} at index ${index}`);
-        return chid;
+        console.log(`Targeting group member ${memberAvatar} at index ${index}`);
+
+        return !full ? chid : {
+            id: chid,
+            avatar: memberAvatar,
+            name: characters.find(y => y.avatar === memberAvatar)?.name,
+            index: index,
+        };
     }
 }
 
