@@ -1443,9 +1443,7 @@ async function sendWindowAIRequest(messages, signal, stream) {
     }
 
     const onStreamResult = (res, err) => {
-        if (err) {
-            return;
-        }
+        if (err) return;
 
         const thisContent = res?.message?.content;
 

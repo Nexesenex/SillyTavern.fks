@@ -235,7 +235,6 @@ export function initDefaultSlashCommands() {
                 description: 'Character name - or unique character identifier (avatar key)',
                 typeList: [ARGUMENT_TYPE.STRING],
                 enumProvider: commonEnumProviders.characters('character'),
-                forceEnum: false,
             }),
         ],
         helpString: `
@@ -274,7 +273,6 @@ export function initDefaultSlashCommands() {
                 typeList: [ARGUMENT_TYPE.STRING],
                 isRequired: true,
                 enumProvider: commonEnumProviders.characters('character'),
-                forceEnum: false,
             }),
             SlashCommandNamedArgument.fromProps({
                 name: 'avatar',
@@ -518,7 +516,6 @@ export function initDefaultSlashCommands() {
                 typeList: [ARGUMENT_TYPE.STRING],
                 isRequired: true,
                 enumProvider: commonEnumProviders.characters('all'),
-                forceEnum: true,
             }),
         ],
         helpString: 'Opens up a chat with the character or group by its name',
@@ -1061,7 +1058,6 @@ export function initDefaultSlashCommands() {
                 typeList: [ARGUMENT_TYPE.STRING],
                 defaultValue: 'System',
                 enumProvider: () => [...commonEnumProviders.characters('character')(), new SlashCommandEnumValue('System', null, enumTypes.enum, enumIcons.assistant)],
-                forceEnum: false,
             }),
             new SlashCommandNamedArgument(
                 'length', 'API response length in tokens', [ARGUMENT_TYPE.NUMBER], false,

@@ -818,7 +818,6 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
 
     /** @type {any} Caution: JS war crimes ahead */
     let textResult = '';
-    let typingIndicator = $('#chat .typing_indicator');
     const group = groups.find((x) => x.id === selected_group);
 
     if (!group || !Array.isArray(group.members) || !group.members.length) {
@@ -833,14 +832,6 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
         setCharacterName('');
         setCharacterId(undefined);
         const userInput = String($('#send_textarea').val());
-
-        if (typingIndicator.length === 0 && !isStreamingEnabled()) {
-            typingIndicator = $(
-                '#typing_indicator_template .typing_indicator',
-            ).clone();
-            typingIndicator.hide();
-            $('#chat').append(typingIndicator);
-        }
 
         // id of this specific batch for regeneration purposes
         group_generation_id = Date.now();
@@ -919,14 +910,6 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
             }
             await eventSource.emit(event_types.GROUP_MEMBER_DRAFTED, chId);
 
-            if (type !== 'swipe' && type !== 'impersonate' && !isStreamingEnabled()) {
-                // update indicator and scroll down
-                typingIndicator
-                    .find('.typing_indicator_name')
-                    .text(characters[chId].name);
-                typingIndicator.show();
-            }
-
             // Wait for generation to finish
             textResult = await Generate(generateType, { automatic_trigger: by_auto_mode, ...(params || {}) });
             let messageChunk = textResult?.messageChunk;
@@ -943,8 +926,6 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
             }
         }
     } finally {
-        typingIndicator.hide();
-
         is_group_generating = false;
         setSendButtonState(false);
         setCharacterId(undefined);
