@@ -2437,7 +2437,9 @@ export async function getWorldEntry(name, data, entry) {
                     setWIOriginalDataValue(data, uid, originalDataValueName, data.entries[uid][entryPropName]);
                     await saveWorldInfo(name, data);
                 }
+                $(this).toggleClass('empty', !data.entries[uid][entryPropName].length);
             });
+            input.toggleClass('empty', !entry[entryPropName].length);
             input.on('select2:select', /** @type {function(*):void} */ event => updateWorldEntryKeyOptionsCache([event.params.data]));
             input.on('select2:unselect', /** @type {function(*):void} */ event => updateWorldEntryKeyOptionsCache([event.params.data], { remove: true }));
 
@@ -2472,6 +2474,7 @@ export async function getWorldEntry(name, data, entry) {
                     data.entries[uid][entryPropName] = splitKeywordsAndRegexes(value);
                     setWIOriginalDataValue(data, uid, originalDataValueName, data.entries[uid][entryPropName]);
                     await saveWorldInfo(name, data);
+                    $(this).toggleClass('empty', !data.entries[uid][entryPropName].length);
                 }
             });
             input.val(entry[entryPropName].join(', ')).trigger('input', { skipReset: true });
