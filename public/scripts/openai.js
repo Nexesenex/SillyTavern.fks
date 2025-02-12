@@ -1917,6 +1917,10 @@ async function sendOpenAIRequest(type, messages, signal) {
         'reasoning_effort': String(oai_settings.reasoning_effort),
     };
 
+    if (!canMultiSwipe && ToolManager.canPerformToolCalls(type)) {
+        await ToolManager.registerFunctionToolsOpenAI(generate_data);
+    }
+
     // Empty array will produce a validation error
     if (!Array.isArray(generate_data.stop) || !generate_data.stop.length) {
         delete generate_data.stop;
@@ -2040,15 +2044,13 @@ async function sendOpenAIRequest(type, messages, signal) {
             delete generate_data.top_logprobs;
             delete generate_data.logprobs;
             delete generate_data.logit_bias;
+            delete generate_data.tools;
+            delete generate_data.tool_choice;
         }
     }
 
     if ((isOAI || isOpenRouter || isMistral || isCustom || isCohere || isNano) && oai_settings.seed >= 0) {
         generate_data['seed'] = oai_settings.seed;
-    }
-
-    if (!canMultiSwipe && ToolManager.canPerformToolCalls(type)) {
-        await ToolManager.registerFunctionToolsOpenAI(generate_data);
     }
 
     if (isOAI && (oai_settings.openai_model.startsWith('o1') || oai_settings.openai_model.startsWith('o3'))) {

@@ -269,7 +269,7 @@ import { initSettingsSearch } from './scripts/setting-search.js';
 import { initBulkEdit } from './scripts/bulk-edit.js';
 import { deriveTemplatesFromChatTemplate } from './scripts/chat-templates.js';
 import { getContext } from './scripts/st-context.js';
-import { extractReasoningFromData, initReasoning, PromptReasoning, updateReasoningTimeUI } from './scripts/reasoning.js';
+import { extractReasoningFromData, initReasoning, PromptReasoning, removeReasoningFromString, updateReasoningTimeUI } from './scripts/reasoning.js';
 
 // API OBJECT FOR EXTERNAL WIRING
 globalThis.SillyTavern = {
@@ -2793,7 +2793,8 @@ export async function generateQuietPrompt(quiet_prompt, quietToLoud, skipWIAN, q
             TempResponseLength.save(main_api, responseLength);
             eventHook = TempResponseLength.setupEventHook(main_api);
         }
-        return await Generate('quiet', options);
+        const result = await Generate('quiet', options);
+        return removeReasoningFromString(result);
     } finally {
         if (responseLengthCustomized && TempResponseLength.isCustomized()) {
             TempResponseLength.restore(main_api);
@@ -3514,7 +3515,7 @@ export async function generateRaw(prompt, api, instructOverride, quietToLoud, sy
                 break;
             }
             case 'textgenerationwebui':
-                generateData = getTextGenGenerationData(prompt, amount_gen, false, false, null, 'quiet');
+                generateData = await getTextGenGenerationData(prompt, amount_gen, false, false, null, 'quiet');
                 TempResponseLength.restore(api);
                 break;
             case 'openai': {
@@ -4651,7 +4652,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             break;
         case 'textgenerationwebui': {
             const cfgValues = useCfgPrompt ? { guidanceScale: cfgGuidanceScale, negativePrompt: await getCombinedPrompt(true) } : null;
-            generate_data = getTextGenGenerationData(finalPrompt, maxLength, isImpersonate, isContinue, cfgValues, type);
+            generate_data = await getTextGenGenerationData(finalPrompt, maxLength, isImpersonate, isContinue, cfgValues, type);
             break;
         }
         case 'novel': {
@@ -5577,13 +5578,24 @@ async function promptItemize(itemizedPrompts, requestedMesId) {
         toastr.info(t`Copied!`);
     });
 
-    popup.dlg.querySelector('#showRawPrompt').addEventListener('click', function () {
+    popup.dlg.querySelector('#showRawPrompt').addEventListener('click', async function () {
         //console.log(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
         console.log(PromptArrayItemForRawPromptDisplay);
         console.log(itemizedPrompts);
         console.log(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
 
         const rawPrompt = flatten(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
+
+        // Mobile needs special handholding. The side-view on the popup wouldn't work,
+        // so we just show an additional popup for this.
+        if (isMobile()) {
+            const content = document.createElement('div');
+            content.classList.add('tokenItemizingMaintext');
+            content.innerText = rawPrompt;
+            const popup = new Popup(content, POPUP_TYPE.TEXT, null, { allowVerticalScrolling: true, leftAlign: true });
+            await popup.show();
+            return;
+        }
 
         //let DisplayStringifiedPrompt = JSON.stringify(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt).replace(/\n+/g, '<br>');
         const rawPromptWrapper = document.getElementById('rawPromptWrapper');
@@ -6991,7 +7003,7 @@ export async function getSettings() {
         loadProxyPresets(settings);
 
         // Allow subscribers to mutate settings
-        eventSource.emit(event_types.SETTINGS_LOADED_AFTER, settings);
+        await eventSource.emit(event_types.SETTINGS_LOADED_AFTER, settings);
 
         // Set context size after loading power user (may override the max value)
         $('#max_context').val(max_context);
@@ -7051,7 +7063,7 @@ export async function getSettings() {
     }
     await validateDisabledSamplers();
     settingsReady = true;
-    eventSource.emit(event_types.SETTINGS_LOADED);
+    await eventSource.emit(event_types.SETTINGS_LOADED);
 }
 
 function selectKoboldGuiPreset() {
@@ -11468,7 +11480,7 @@ jQuery(async function () {
                 );
                 break;*/
             default:
-                eventSource.emit('charManagementDropdown', target);
+                await eventSource.emit('charManagementDropdown', target);
         }
         $('#char-management-dropdown').prop('selectedIndex', 0);
     });
@@ -11630,7 +11642,7 @@ jQuery(async function () {
 
     $(document).on('click', '.open_characters_library', async function () {
         await getCharacters();
-        eventSource.emit(event_types.OPEN_CHARACTER_LIBRARY);
+        await eventSource.emit(event_types.OPEN_CHARACTER_LIBRARY);
     });
 
     // Added here to prevent execution before script.js is loaded and get rid of quirky timeouts

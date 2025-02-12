@@ -262,6 +262,10 @@ input[type='checkbox']:focus-visible {
     color: var(--SmartThemeEmColor);
 }
 
+.tokenItemizingMaintext {
+    font-size: calc(var(--mainFontSize) * 0.8);
+}
+
 .tokenGraph {
     border-radius: 10px;
     border: 1px solid var(--SmartThemeBorderColor);
@@ -5746,11 +5750,13 @@ body:not(.movingUI) .drawer-content.maximized {
     overflow-wrap: anywhere;
 }
 
+#SystemPromptColumn summary,
 #InstructSequencesColumn summary {
     font-size: 0.95em;
     cursor: pointer;
 }
 
+#SystemPromptColumn details,
 #InstructSequencesColumn details:not(:last-of-type) {
     margin-bottom: 5px;
 }
