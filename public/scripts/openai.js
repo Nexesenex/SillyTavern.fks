@@ -73,6 +73,7 @@ import { SlashCommandEnumValue } from './slash-commands/SlashCommandEnumValue.js
 import { Popup, POPUP_RESULT } from './popup.js';
 import { t } from './i18n.js';
 import { ToolManager } from './tool-calling.js';
+import { accountStorage } from './util/AccountStorage.js';
 
 export {
     openai_messages_count,
@@ -82,7 +83,6 @@ export {
     setOpenAIMessageExamples,
     setupChatCompletionPromptManager,
     sendOpenAIRequest,
-    getChatCompletionModel,
     TokenHandler,
     IdentifierNotFoundError,
     Message,
@@ -414,7 +414,7 @@ async function validateReverseProxy() {
         throw err;
     }
     const rememberKey = `Proxy_SkipConfirm_${getStringHash(oai_settings.reverse_proxy)}`;
-    const skipConfirm = localStorage.getItem(rememberKey) === 'true';
+    const skipConfirm = accountStorage.getItem(rememberKey) === 'true';
 
     const confirmation = skipConfirm || await Popup.show.confirm(t`Connecting To Proxy`, await renderTemplateAsync('proxyConnectionWarning', { proxyURL: DOMPurify.sanitize(oai_settings.reverse_proxy) }));
 
@@ -425,7 +425,7 @@ async function validateReverseProxy() {
         throw new Error('Proxy connection denied.');
     }
 
-    localStorage.setItem(rememberKey, String(true));
+    accountStorage.setItem(rememberKey, String(true));
 }
 
 /**
@@ -1497,7 +1497,7 @@ async function sendWindowAIRequest(messages, signal, stream) {
     }
 }
 
-function getChatCompletionModel() {
+export function getChatCompletionModel() {
     switch (oai_settings.chat_completion_source) {
         case chat_completion_sources.CLAUDE:
             return oai_settings.claude_model;
