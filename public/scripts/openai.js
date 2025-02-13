@@ -4967,6 +4967,8 @@ export function isImageInliningSupported() {
         'gpt-4-turbo',
         'gpt-4o',
         'gpt-4o-mini',
+        'o1',
+        'o1-2024-12-17',
         'chatgpt-4o-latest',
         'yi-vision',
         'pixtral-latest',
