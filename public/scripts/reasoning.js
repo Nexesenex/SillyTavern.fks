@@ -94,7 +94,7 @@ export function isHiddenReasoningModel() {
         { name: 'gemini-2.0-pro-exp', func: FUNCS.startsWith },
     ];
 
-    const model = getChatCompletionModel();
+    const model = getChatCompletionModel() || '';
 
     const isHidden = hiddenReasoningModels.some(({ name, func }) => func(model, name));
     return isHidden;
