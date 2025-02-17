@@ -366,6 +366,10 @@ DOMPurify.addHook('uponSanitizeElement', (node, _, config) => {
         return;
     }
 
+    if (!(node instanceof Element)) {
+        return;
+    }
+
     let mediaBlocked = false;
 
     switch (node.tagName) {
@@ -493,6 +497,7 @@ export const event_types = {
     // TODO: Naming convention is inconsistent with other events
     CHARACTER_DELETED: 'characterDeleted',
     CHARACTER_DUPLICATED: 'character_duplicated',
+    CHARACTER_RENAMED: 'character_renamed',
     /** @deprecated The event is aliased to STREAM_TOKEN_RECEIVED. */
     SMOOTH_STREAM_TOKEN_RECEIVED: 'stream_token_received',
     STREAM_TOKEN_RECEIVED: 'stream_token_received',
@@ -1027,12 +1032,22 @@ export function setAnimationDuration(ms = null) {
     document.documentElement.style.setProperty('--animation-duration', `${animation_duration}ms`);
 }
 
+/**
+ * Sets the currently active character
+ * @param {object|number|string} [entityOrKey] - An entity with id property (character, group, tag), or directly an id or tag key. If not provided, the active character is reset to `null`.
+ */
 export function setActiveCharacter(entityOrKey) {
-    active_character = getTagKeyForEntity(entityOrKey);
+    active_character = entityOrKey ? getTagKeyForEntity(entityOrKey) : null;
+    if (active_character) active_group = null;
 }
 
+/**
+ * Sets the currently active group.
+ * @param {object|number|string} [entityOrKey] - An entity with id property (character, group, tag), or directly an id or tag key. If not provided, the active group is reset to `null`.
+ */
 export function setActiveGroup(entityOrKey) {
-    active_group = getTagKeyForEntity(entityOrKey);
+    active_group = entityOrKey ? getTagKeyForEntity(entityOrKey) : null;
+    if (active_group) active_character = null;
 }
 
 /**
@@ -3223,6 +3238,7 @@ class StreamingProcessor {
 
             // Update reasoning
             await this.reasoningHandler.process(messageId, mesChanged);
+            processedText = chat[messageId]['mes'];
 
             // Token count update.
             const tokenCountText = this.reasoningHandler.reasoning + processedText;
@@ -3373,7 +3389,7 @@ class StreamingProcessor {
                     this.messageLogprobs.push(...(Array.isArray(logprobs) ? logprobs : [logprobs]));
                 }
                 // Get the updated reasoning string into the handler
-                this.reasoningHandler.updateReasoning(this.messageId, state?.reasoning ?? '');
+                this.reasoningHandler.updateReasoning(this.messageId, state?.reasoning);
                 await eventSource.emit(event_types.STREAM_TOKEN_RECEIVED, text);
                 await sw.tick(async () => await this.onProgressStreaming(this.messageId, this.continueMessage + text));
             }
@@ -6241,8 +6257,34 @@ export async function renameCharacter(name = null, { silent = false, renameChats
             const data = await response.json();
             const newAvatar = data.avatar;
 
-            // Replace tags list
+            const oldName = getCharaFilename(null, { manualAvatarKey: oldAvatar });
+            const newName = getCharaFilename(null, { manualAvatarKey: newAvatar });
+
+            // Replace other auxillery fields where was referenced by avatar key
+            // Tag List
             renameTagKey(oldAvatar, newAvatar);
+
+            // Addtional lore books
+            const charLore = world_info.charLore?.find(x => x.name == oldName);
+            if (charLore) {
+                charLore.name = newName;
+                saveSettingsDebounced();
+            }
+
+            // Char-bound Author's Notes
+            const charNote = extension_settings.note.chara?.find(x => x.name == oldName);
+            if (charNote) {
+                charNote.name = newName;
+                saveSettingsDebounced();
+            }
+
+            // Update active character, if the current one was the currently active one
+            if (active_character === oldAvatar) {
+                active_character = newAvatar;
+                saveSettingsDebounced();
+            }
+
+            await eventSource.emit(event_types.CHARACTER_RENAMED, oldAvatar, newAvatar);
 
             // Reload characters list
             await getCharacters();
@@ -10947,7 +10989,7 @@ jQuery(async function () {
     });
 
     $(document).on('click', '.mes_edit_copy', async function () {
-        const confirmation = await callGenericPopup('Create a copy of this message?', POPUP_TYPE.CONFIRM);
+        const confirmation = await callGenericPopup(t`Create a copy of this message?`, POPUP_TYPE.CONFIRM);
         if (!confirmation) {
             return;
         }
