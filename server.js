@@ -243,7 +243,6 @@ const cliArguments = yargs(hideBin(process.argv))
         describe: 'Request proxy URL (HTTP or SOCKS protocols)',
     }).option('requestProxyBypass', {
         type: 'array',
-        default: null,
         describe: 'Request proxy bypass list (space separated list of hosts)',
     }).parseSync();
 

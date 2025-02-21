@@ -338,14 +338,15 @@ export class ReasoningHandler {
             return mesChanged;
         }
 
-        if (this.state === ReasoningState.None) {
+        if (this.state === ReasoningState.None || this.#isHiddenReasoningModel) {
             // If streamed message starts with the opening, cut it out and put all inside reasoning
             if (message.mes.startsWith(power_user.reasoning.prefix) && message.mes.length > power_user.reasoning.prefix.length) {
                 this.#isParsingReasoning = true;
 
                 // Manually set starting state here, as we might already have received the ending suffix
                 this.state = ReasoningState.Thinking;
-                this.startTime = this.initialTime;
+                this.startTime = this.startTime ?? this.initialTime;
+                this.endTime = null;
             }
         }
 
