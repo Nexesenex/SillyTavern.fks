@@ -694,6 +694,9 @@ export function getTokenizerModel() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.GROQ) {
+        if (oai_settings.groq_model.includes('qwen')) {
+            return qwen2Tokenizer;
+        }
         if (oai_settings.groq_model.includes('llama-3') || oai_settings.groq_model.includes('llama3')) {
             return llama3Tokenizer;
         }
