@@ -393,8 +393,8 @@ export let proxies = [
 ];
 export let selected_proxy = proxies[0];
 
-let openai_setting_names;
-let openai_settings;
+export let openai_setting_names;
+export let openai_settings;
 
 /** @type {import('./PromptManager.js').PromptManager} */
 export let promptManager = null;
@@ -2149,6 +2149,9 @@ async function sendOpenAIRequest(type, messages, signal) {
  */
 function getStreamingReply(data, state) {
     if (oai_settings.chat_completion_source === chat_completion_sources.CLAUDE) {
+        if (oai_settings.show_thoughts) {
+            state.reasoning += data?.delta?.thinking || '';
+        }
         return data?.delta?.text || '';
     } else if (oai_settings.chat_completion_source === chat_completion_sources.MAKERSUITE) {
         if (oai_settings.show_thoughts) {
@@ -4981,6 +4984,7 @@ export function isImageInliningSupported() {
         'gemini-1.5-pro-exp-0827',
         'claude-3',
         'claude-3-5',
+        'claude-3-7',
         'gpt-4-turbo',
         'gpt-4o',
         'gpt-4o-mini',

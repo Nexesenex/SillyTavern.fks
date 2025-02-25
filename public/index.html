@@ -2000,7 +2000,7 @@
                                             </span>
                                         </div>
                                     </div>
-                                    <div class="range-block" data-source="deepseek,openrouter,custom">
+                                    <div class="range-block" data-source="deepseek,openrouter,custom,claude">
                                         <label for="openai_show_thoughts" class="checkbox_label widthFreeExpand">
                                             <input id="openai_show_thoughts" type="checkbox" />
                                             <span>
@@ -2014,10 +2014,11 @@
                                             </span>
                                         </div>
                                     </div>
-                                    <div class="flex-container flexFlowColumn wide100p textAlignCenter marginTop10" data-source="openai,custom">
+                                    <div class="flex-container flexFlowColumn wide100p textAlignCenter marginTop10" data-source="openai,custom,claude">
                                         <div class="flex-container oneline-dropdown" title="Constrains effort on reasoning for reasoning models.&#10;Currently supported values are low, medium, and high.&#10;Reducing reasoning effort can result in faster responses and fewer tokens used on reasoning in a response." data-i18n="[title]Constrains effort on reasoning for reasoning models.">
-                                            <label for="openai_reasoning_effort" data-i18n="Reasoning Effort">
-                                                Reasoning Effort
+                                            <label for="openai_reasoning_effort">
+                                                <span data-i18n="Reasoning Effort">Reasoning Effort</span>
+                                                <i data-source="claude" class="opacity50p fa-solid fa-circle-info" title="Allocates a portion of the response length for thinking (low: 10%, medium: 25%, high: 50%), but minimum 1024 tokens."></i>
                                             </label>
                                             <select id="openai_reasoning_effort">
                                                 <option data-i18n="openai_reasoning_effort_low" value="low">Low</option>
@@ -2915,6 +2916,8 @@
                                 <h4 data-i18n="Claude Model">Claude Model</h4>
                                 <select id="model_claude_select">
                                     <optgroup label="Versions">
+                                        <option value="claude-3-7-sonnet-latest">claude-3-7-sonnet-latest</option>
+                                        <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet-20250219</option>
                                         <option value="claude-3-5-sonnet-latest">claude-3-5-sonnet-latest</option>
                                         <option value="claude-3-5-sonnet-20241022">claude-3-5-sonnet-20241022</option>
                                         <option value="claude-3-5-sonnet-20240620">claude-3-5-sonnet-20240620</option>
@@ -4429,7 +4432,7 @@
                                 <input id="prefer_character_jailbreak" type="checkbox" />
                                 <small data-i18n="Prefer Character Card Instructions">Prefer Char. Instructions</small>
                             </label>
-                            <label class="checkbox_label" for="never_resize_avatars" title="Avoid cropping and resizing imported character images. When off, crop/resize to 512x768." data-i18n="[title]Avoid cropping and resizing imported character images. When off, crop/resize to 512x768">
+                            <label class="checkbox_label" for="never_resize_avatars" title="Avoid cropping and resizing imported character images. When off, crop/resize to 512x768.&#10;This will disable the upload cropping popup for avatars." data-i18n="[title]never_resize_avatars_tooltip">
                                 <input id="never_resize_avatars" type="checkbox" />
                                 <small data-i18n="Never resize avatars">Never resize avatars</small>
                             </label>
