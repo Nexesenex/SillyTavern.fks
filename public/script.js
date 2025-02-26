@@ -500,6 +500,7 @@ export const event_types = {
     CHARACTER_DELETED: 'characterDeleted',
     CHARACTER_DUPLICATED: 'character_duplicated',
     CHARACTER_RENAMED: 'character_renamed',
+    CHARACTER_RENAMED_IN_PAST_CHAT: 'character_renamed_in_past_chat',
     /** @deprecated The event is aliased to STREAM_TOKEN_RECEIVED. */
     SMOOTH_STREAM_TOKEN_RECEIVED: 'stream_token_received',
     STREAM_TOKEN_RECEIVED: 'stream_token_received',
@@ -6270,6 +6271,23 @@ export function setSendButtonState(value) {
     is_send_press = value;
 }
 
+/**
+ * Renames the currently selected character, updating relevant references and optionally renaming past chats.
+ *
+ * If no name is provided, a popup prompts for a new name. If the new name matches the current name,
+ * the renaming process is aborted. The function sends a request to the server to rename the character
+ * and handles updates to other related fields such as tags, lore, and author notes.
+ *
+ * If the renaming is successful, the character list is reloaded and the renamed character is selected.
+ * Optionally, past chats can be renamed to reflect the new character name.
+ *
+ * @param {string?} [name=null] - The new name for the character. If not provided, a popup will prompt for it.
+ * @param {object} [options] - Additional options.
+ * @param {boolean} [options.silent=false] - If true, suppresses popups and warnings.
+ * @param {boolean?} [options.renameChats=null] - If true, renames past chats to reflect the new character name.
+ * @returns {Promise<boolean>} - Returns true if the character was successfully renamed, false otherwise.
+ */
+
 export async function renameCharacter(name = null, { silent = false, renameChats = null } = {}) {
     if (!name && silent) {
         toastr.warning(t`No character name provided.`, t`Rename Character`);
@@ -6353,13 +6371,18 @@ export async function renameCharacter(name = null, { silent = false, renameChats
 
                 // Also rename as a group member
                 await renameGroupMember(oldAvatar, newAvatar, newValue);
-                const renamePastChatsConfirm = renameChats !== null ? renameChats
-                    : silent ? false : await callPopup(`<h3>Character renamed!</h3>
-                <p>Past chats will still contain the old character name. Would you like to update the character name in previous chats as well?</p>
-                <i><b>Sprites folder (if any) should be renamed manually.</b></i>`, 'confirm');
+                const renamePastChatsConfirm = renameChats !== null
+                    ? renameChats
+                    : silent
+                        ? false
+                        : await Popup.show.confirm(
+                            t`Character renamed!`,
+                            `<p>${t`Past chats will still contain the old character name. Would you like to update the character name in previous chats as well?`}</p>
+                            <i><b>${t`Sprites folder (if any) should be renamed manually.`}</b></i>`,
+                        ) == POPUP_RESULT.AFFIRMATIVE;
 
                 if (renamePastChatsConfirm) {
-                    await renamePastChats(newAvatar, newValue);
+                    await renamePastChats(oldAvatar, newAvatar, newValue);
                     await reloadCurrentChat();
                     toastr.success(t`Character renamed and past chats updated!`, t`Rename Character`);
                 } else {
@@ -6376,7 +6399,7 @@ export async function renameCharacter(name = null, { silent = false, renameChats
     }
     catch (error) {
         // Reloading to prevent data corruption
-        if (!silent) await callPopup(t`Something went wrong. The page will be reloaded.`, 'text');
+        if (!silent) await Popup.show.text(t`Rename Character`, t`Something went wrong. The page will be reloaded.`);
         else toastr.error(t`Something went wrong. The page will be reloaded.`, t`Rename Character`);
 
         console.log('Renaming character error:', error);
@@ -6387,7 +6410,7 @@ export async function renameCharacter(name = null, { silent = false, renameChats
     return true;
 }
 
-async function renamePastChats(newAvatar, newValue) {
+async function renamePastChats(oldAvatar, newAvatar, newName) {
     const pastChats = await getPastCharacterChats();
 
     for (const { file_name } of pastChats) {
@@ -6397,7 +6420,7 @@ async function renamePastChats(newAvatar, newValue) {
                 method: 'POST',
                 headers: getRequestHeaders(),
                 body: JSON.stringify({
-                    ch_name: newValue,
+                    ch_name: newName,
                     file_name: fileNameWithoutExtension,
                     avatar_url: newAvatar,
                 }),
@@ -6413,15 +6436,17 @@ async function renamePastChats(newAvatar, newValue) {
                     }
 
                     if (message.name !== undefined) {
-                        message.name = newValue;
+                        message.name = newName;
                     }
                 }
+
+                await eventSource.emit(event_types.CHARACTER_RENAMED_IN_PAST_CHAT, currentChat, oldAvatar, newAvatar);
 
                 const saveChatResponse = await fetch('/api/chats/save', {
                     method: 'POST',
                     headers: getRequestHeaders(),
                     body: JSON.stringify({
-                        ch_name: newValue,
+                        ch_name: newName,
                         file_name: fileNameWithoutExtension,
                         chat: currentChat,
                         avatar_url: newAvatar,
