@@ -108,6 +108,7 @@ export function isHiddenReasoningModel() {
 
     /** @type {{ name: string; func: MatchingFunc; }[]} */
     const hiddenReasoningModels = [
+        { name: 'gpt-4.5', func: FUNCS.startsWith },
         { name: 'o1', func: FUNCS.startsWith },
         { name: 'o3', func: FUNCS.startsWith },
         { name: 'gemini-2.0-flash-thinking-exp', func: FUNCS.startsWith },
@@ -185,6 +186,17 @@ export class ReasoningHandler {
         this.messageReasoningContentDom = null;
         /** @type {HTMLElement} Reasoning header DOM element `.mes_reasoning_header_title` */
         this.messageReasoningHeaderDom = null;
+    }
+
+    /**
+     * Sets the reasoning state when continuing a prompt.
+     * @param {PromptReasoning} promptReasoning Prompt reasoning object
+     */
+    initContinue(promptReasoning) {
+        this.reasoning = promptReasoning.prefixReasoning;
+        this.state = ReasoningState.Done;
+        this.startTime = this.initialTime;
+        this.endTime = promptReasoning.prefixDuration ? new Date(this.initialTime.getTime() + promptReasoning.prefixDuration) : null;
     }
 
     /**
@@ -493,7 +505,7 @@ export class ReasoningHandler {
             data = null;
         }
 
-        if (this.type !== ReasoningType.Model) {
+        if (this.type && this.type !== ReasoningType.Model) {
             title += ` [${translate(this.type)}]`;
             title = title.trim();
         }
@@ -513,6 +525,9 @@ export class PromptReasoning {
 
     constructor() {
         this.counter = 0;
+        this.prefixLength = -1;
+        this.prefixReasoning = '';
+        this.prefixDuration = null;
     }
 
     /**
@@ -532,9 +547,10 @@ export class PromptReasoning {
      * @param {string} content Message content
      * @param {string} reasoning Message reasoning
      * @param {boolean} isPrefix Whether this is the last message prefix
+     * @param {number?} duration Duration of the reasoning
      * @returns {string} Message content with reasoning
      */
-    addToMessage(content, reasoning, isPrefix) {
+    addToMessage(content, reasoning, isPrefix, duration) {
         // Disabled or reached limit of additions
         if (!isPrefix && (!power_user.reasoning.add_to_prompts || this.counter >= power_user.reasoning.max_additions)) {
             return content;
@@ -555,11 +571,35 @@ export class PromptReasoning {
 
         // Combine parts with reasoning only
         if (isPrefix && !content) {
-            return `${prefix}${reasoning}`;
+            const formattedReasoning = `${prefix}${reasoning}`;
+            if (isPrefix) {
+                this.prefixReasoning = reasoning;
+                this.prefixLength = formattedReasoning.length;
+                this.prefixDuration = duration;
+            }
+            return formattedReasoning;
         }
 
         // Combine parts with reasoning and content
-        return `${prefix}${reasoning}${suffix}${separator}${content}`;
+        const formattedReasoning = `${prefix}${reasoning}${suffix}${separator}`;
+        if (isPrefix) {
+            this.prefixReasoning = reasoning;
+            this.prefixLength = formattedReasoning.length;
+            this.prefixDuration = duration;
+        }
+        return `${formattedReasoning}${content}`;
+    }
+
+    /**
+     * Removes the reasoning prefix from the content.
+     * @param {string} content Content with the reasoning prefix
+     * @returns {string} Content without the reasoning prefix
+     */
+    removePrefix(content) {
+        if (this.prefixLength > 0) {
+            return content.slice(this.prefixLength);
+        }
+        return content;
     }
 }
 

@@ -6,6 +6,7 @@ import { Readable } from 'node:stream';
 import { createRequire } from 'node:module';
 import { Buffer } from 'node:buffer';
 import { promises as dnsPromise } from 'node:dns';
+import os from 'node:os';
 
 import yaml from 'yaml';
 import { sync as commandExistsSync } from 'command-exists';
@@ -13,6 +14,7 @@ import _ from 'lodash';
 import yauzl from 'yauzl';
 import mime from 'mime-types';
 import { default as simpleGit } from 'simple-git';
+import chalk from 'chalk';
 import { LOG_LEVELS } from './constants.js';
 
 /**
@@ -322,21 +324,7 @@ export function deepMerge(target, source) {
     return output;
 }
 
-export const color = {
-    byNum: (mess, fgNum) => {
-        mess = mess || '';
-        fgNum = fgNum === undefined ? 31 : fgNum;
-        return '\u001b[' + fgNum + 'm' + mess + '\u001b[39m';
-    },
-    black: (mess) => color.byNum(mess, 30),
-    red: (mess) => color.byNum(mess, 31),
-    green: (mess) => color.byNum(mess, 32),
-    yellow: (mess) => color.byNum(mess, 33),
-    blue: (mess) => color.byNum(mess, 34),
-    magenta: (mess) => color.byNum(mess, 35),
-    cyan: (mess) => color.byNum(mess, 36),
-    white: (mess) => color.byNum(mess, 37),
-};
+export const color = chalk;
 
 /**
  * Gets a random UUIDv4 string.
@@ -771,6 +759,53 @@ export async function canResolve(name, useIPv6 = true, useIPv4 = true) {
 }
 
 /**
+ * Checks the network interfaces to determine the presence of IPv6 and IPv4 addresses.
+ *
+ * @typedef {object} IPQueryResult
+ * @property {boolean} hasIPv6Any - Whether the computer has any IPv6 address, including (`::1`).
+ * @property {boolean} hasIPv4Any - Whether the computer has any IPv4 address, including (`127.0.0.1`).
+ * @property {boolean} hasIPv6Local - Whether the computer has local IPv6 address (`::1`).
+ * @property {boolean} hasIPv4Local - Whether the computer has local IPv4 address (`127.0.0.1`).
+ * @returns {Promise<IPQueryResult>} A promise that resolves to an array containing:
+ */
+export async function getHasIP() {
+    let hasIPv6Any = false;
+    let hasIPv6Local = false;
+
+    let hasIPv4Any = false;
+    let hasIPv4Local = false;
+
+    const interfaces = os.networkInterfaces();
+
+    for (const iface of Object.values(interfaces)) {
+        if (iface === undefined) {
+            continue;
+        }
+
+        for (const info of iface) {
+            if (info.family === 'IPv6') {
+                hasIPv6Any = true;
+                if (info.address === '::1') {
+                    hasIPv6Local = true;
+                }
+            }
+
+            if (info.family === 'IPv4') {
+                hasIPv4Any = true;
+                if (info.address === '127.0.0.1') {
+                    hasIPv4Local = true;
+                }
+            }
+            if (hasIPv6Any && hasIPv4Any && hasIPv6Local && hasIPv4Local) break;
+        }
+        if (hasIPv6Any && hasIPv4Any && hasIPv6Local && hasIPv4Local) break;
+    }
+
+    return { hasIPv6Any, hasIPv4Any, hasIPv6Local, hasIPv4Local };
+}
+
+
+/**
  * Converts various JavaScript primitives to boolean values.
  * Handles special case for "true"/"false" strings (case-insensitive)
  *
@@ -809,10 +844,10 @@ export function stringToBool(str) {
 export function setupLogLevel() {
     const logLevel = getConfigValue('logging.minLogLevel', LOG_LEVELS.DEBUG, 'number');
 
-    globalThis.console.debug = logLevel <= LOG_LEVELS.DEBUG ? console.debug : () => {};
-    globalThis.console.info = logLevel <= LOG_LEVELS.INFO ? console.info : () => {};
-    globalThis.console.warn = logLevel <= LOG_LEVELS.WARN ? console.warn : () => {};
-    globalThis.console.error = logLevel <= LOG_LEVELS.ERROR ? console.error : () => {};
+    globalThis.console.debug = logLevel <= LOG_LEVELS.DEBUG ? console.debug : () => { };
+    globalThis.console.info = logLevel <= LOG_LEVELS.INFO ? console.info : () => { };
+    globalThis.console.warn = logLevel <= LOG_LEVELS.WARN ? console.warn : () => { };
+    globalThis.console.error = logLevel <= LOG_LEVELS.ERROR ? console.error : () => { };
 }
 
 /**
@@ -1004,4 +1039,17 @@ export class MemoryLimitedMap {
 export function safeReadFileSync(filePath, options = { encoding: 'utf-8' }) {
     if (fs.existsSync(filePath)) return fs.readFileSync(filePath, options);
     return null;
+}
+
+/**
+ * Set the title of the terminal window
+ * @param {string} title Desired title for the window
+ */
+export function setWindowTitle(title) {
+    if (process.platform === 'win32') {
+        process.title = title;
+    }
+    else {
+        process.stdout.write(`\x1b]2;${title}\x1b\x5c`);
+    }
 }

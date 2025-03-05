@@ -197,7 +197,7 @@ const calculateChatSize = (charDir) => {
 
 // Calculate the total string length of the data object
 const calculateDataSize = (data) => {
-    return typeof data === 'object' ? Object.values(data).reduce((acc, val) => acc + new String(val).length, 0) : 0;
+    return typeof data === 'object' ? Object.values(data).reduce((acc, val) => acc + String(val).length, 0) : 0;
 };
 
 /**
