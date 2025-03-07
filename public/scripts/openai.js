@@ -300,6 +300,7 @@ export const settingsToUpdate = {
     function_calling: ['#openai_function_calling', 'function_calling', true],
     show_thoughts: ['#openai_show_thoughts', 'show_thoughts', true],
     reasoning_effort: ['#openai_reasoning_effort', 'reasoning_effort', false],
+    enable_web_search: ['#openai_enable_web_search', 'enable_web_search', true],
     seed: ['#seed_openai', 'seed', false],
     n: ['#n_openai', 'n', false],
     bypass_status_check: ['#openai_bypass_status_check', 'bypass_status_check', true],
@@ -380,6 +381,7 @@ const default_settings = {
     custom_prompt_post_processing: custom_prompt_post_processing_types.NONE,
     show_thoughts: true,
     reasoning_effort: 'medium',
+    enable_web_search: false,
     seed: -1,
     n: 1,
 };
@@ -459,6 +461,7 @@ const oai_settings = {
     custom_prompt_post_processing: custom_prompt_post_processing_types.NONE,
     show_thoughts: true,
     reasoning_effort: 'medium',
+    enable_web_search: false,
     seed: -1,
     n: 1,
 };
@@ -2000,6 +2003,7 @@ async function sendOpenAIRequest(type, messages, signal) {
         'group_names': getGroupNames(),
         'include_reasoning': Boolean(oai_settings.show_thoughts),
         'reasoning_effort': String(oai_settings.reasoning_effort),
+        'enable_web_search': Boolean(oai_settings.enable_web_search),
     };
 
     if (!canMultiSwipe && ToolManager.canPerformToolCalls(type)) {
@@ -2068,6 +2072,7 @@ async function sendOpenAIRequest(type, messages, signal) {
 
     if (isMistral) {
         generate_data['safe_prompt'] = false; // already defaults to false, but just incase they change that in the future.
+        generate_data['stop'] = getCustomStoppingStrings(); // Mistral shouldn't have limits on stop strings.
     }
 
     if (isCustom) {
@@ -3222,6 +3227,7 @@ function loadOpenAISettings(data, settings) {
     oai_settings.bypass_status_check = settings.bypass_status_check ?? default_settings.bypass_status_check;
     oai_settings.show_thoughts = settings.show_thoughts ?? default_settings.show_thoughts;
     oai_settings.reasoning_effort = settings.reasoning_effort ?? default_settings.reasoning_effort;
+    oai_settings.enable_web_search = settings.enable_web_search ?? default_settings.enable_web_search;
     oai_settings.seed = settings.seed ?? default_settings.seed;
     oai_settings.n = settings.n ?? default_settings.n;
 
@@ -3349,6 +3355,7 @@ function loadOpenAISettings(data, settings) {
     $('#seed_openai').val(oai_settings.seed);
     $('#n_openai').val(oai_settings.n);
     $('#openai_show_thoughts').prop('checked', oai_settings.show_thoughts);
+    $('#openai_enable_web_search').prop('checked', oai_settings.enable_web_search);
 
     $('#openai_reasoning_effort').val(oai_settings.reasoning_effort);
     $(`#openai_reasoning_effort option[value="${oai_settings.reasoning_effort}"]`).prop('selected', true);
@@ -3613,6 +3620,7 @@ async function saveOpenAIPreset(name, settings, triggerUi = true) {
         function_calling: settings.function_calling,
         show_thoughts: settings.show_thoughts,
         reasoning_effort: settings.reasoning_effort,
+        enable_web_search: settings.enable_web_search,
         seed: settings.seed,
         n: settings.n,
     };
@@ -5569,6 +5577,11 @@ export function initOpenAI() {
 
     $('#openai_reasoning_effort').on('input', function () {
         oai_settings.reasoning_effort = String($(this).val());
+        saveSettingsDebounced();
+    });
+
+    $('#openai_enable_web_search').on('input', function () {
+        oai_settings.enable_web_search = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
 

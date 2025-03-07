@@ -1951,7 +1951,18 @@
                                             </span>
                                         </div>
                                     </div>
-                                    <div class="range-block" data-source="openai,cohere,mistralai,custom,claude,openrouter,groq,deepseek">
+                                    <div class="range-block" data-source="makersuite,openrouter">
+                                        <label for="openai_enable_web_search" class="checkbox_label flexWrap widthFreeExpand">
+                                            <input id="openai_enable_web_search" type="checkbox" />
+                                            <span data-i18n="Enable web search">Enable web search</span>
+                                        </label>
+                                        <div class="flexBasis100p toggle-description justifyLeft">
+                                            <span>
+                                                Use search capabilities provided by the backend.
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="range-block" data-source="openai,cohere,mistralai,custom,claude,openrouter,groq,deepseek,makersuite">
                                         <label for="openai_function_calling" class="checkbox_label flexWrap widthFreeExpand">
                                             <input id="openai_function_calling" type="checkbox" />
                                             <span data-i18n="Enable function calling">Enable function calling</span>
