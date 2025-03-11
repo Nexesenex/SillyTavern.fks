@@ -5,7 +5,6 @@ import vectra from 'vectra';
 import express from 'express';
 import sanitize from 'sanitize-filename';
 
-import { jsonParser } from '../express-common.js';
 import { getConfigValue } from '../util.js';
 
 import { getNomicAIBatchVector, getNomicAIVector } from '../vectors/nomicai-vectors.js';
@@ -384,7 +383,7 @@ async function regenerateCorruptedIndexErrorHandler(req, res, error) {
 
 export const router = express.Router();
 
-router.post('/query', jsonParser, async (req, res) => {
+router.post('/query', async (req, res) => {
     try {
         if (!req.body.collectionId || !req.body.searchText) {
             return res.sendStatus(400);
@@ -404,7 +403,7 @@ router.post('/query', jsonParser, async (req, res) => {
     }
 });
 
-router.post('/query-multi', jsonParser, async (req, res) => {
+router.post('/query-multi', async (req, res) => {
     try {
         if (!Array.isArray(req.body.collectionIds) || !req.body.searchText) {
             return res.sendStatus(400);
@@ -424,7 +423,7 @@ router.post('/query-multi', jsonParser, async (req, res) => {
     }
 });
 
-router.post('/insert', jsonParser, async (req, res) => {
+router.post('/insert', async (req, res) => {
     try {
         if (!Array.isArray(req.body.items) || !req.body.collectionId) {
             return res.sendStatus(400);
@@ -442,7 +441,7 @@ router.post('/insert', jsonParser, async (req, res) => {
     }
 });
 
-router.post('/list', jsonParser, async (req, res) => {
+router.post('/list', async (req, res) => {
     try {
         if (!req.body.collectionId) {
             return res.sendStatus(400);
@@ -459,7 +458,7 @@ router.post('/list', jsonParser, async (req, res) => {
     }
 });
 
-router.post('/delete', jsonParser, async (req, res) => {
+router.post('/delete', async (req, res) => {
     try {
         if (!Array.isArray(req.body.hashes) || !req.body.collectionId) {
             return res.sendStatus(400);
@@ -477,7 +476,7 @@ router.post('/delete', jsonParser, async (req, res) => {
     }
 });
 
-router.post('/purge-all', jsonParser, async (req, res) => {
+router.post('/purge-all', async (req, res) => {
     try {
         for (const source of SOURCES) {
             const sourcePath = path.join(req.user.directories.vectors, sanitize(source));
@@ -495,7 +494,7 @@ router.post('/purge-all', jsonParser, async (req, res) => {
     }
 });
 
-router.post('/purge', jsonParser, async (req, res) => {
+router.post('/purge', async (req, res) => {
     try {
         if (!req.body.collectionId) {
             return res.sendStatus(400);

@@ -2,7 +2,6 @@ import process from 'node:process';
 import express from 'express';
 import fetch from 'node-fetch';
 
-import { jsonParser } from '../../express-common.js';
 import {
     CHAT_COMPLETION_SOURCES,
     GEMINI_SAFETY,
@@ -821,7 +820,7 @@ async function sendDeepSeekRequest(request, response) {
 
 export const router = express.Router();
 
-router.post('/status', jsonParser, async function (request, response_getstatus_openai) {
+router.post('/status', async function (request, response_getstatus_openai) {
     if (!request.body) return response_getstatus_openai.sendStatus(400);
 
     let api_url;
@@ -937,7 +936,7 @@ router.post('/status', jsonParser, async function (request, response_getstatus_o
     }
 });
 
-router.post('/bias', jsonParser, async function (request, response) {
+router.post('/bias', async function (request, response) {
     if (!request.body || !Array.isArray(request.body))
         return response.sendStatus(400);
 
@@ -1022,7 +1021,7 @@ router.post('/bias', jsonParser, async function (request, response) {
 });
 
 
-router.post('/generate', jsonParser, function (request, response) {
+router.post('/generate', function (request, response) {
     if (!request.body) return response.status(400).send({ error: true });
 
     switch (request.body.chat_completion_source) {

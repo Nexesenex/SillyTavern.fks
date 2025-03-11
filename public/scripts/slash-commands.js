@@ -1294,14 +1294,14 @@ export function initDefaultSlashCommands() {
             }),
             SlashCommandNamedArgument.fromProps({
                 name: 'large',
-                description: 'show large input field',
+                description: 'popup window will be shown larger in height, with more space for content (input field needs to be sized via \'rows\' argument)',
                 typeList: [ARGUMENT_TYPE.BOOLEAN],
                 defaultValue: 'off',
                 enumList: commonEnumProviders.boolean('onOff')(),
             }),
             SlashCommandNamedArgument.fromProps({
                 name: 'wide',
-                description: 'show wide input field',
+                description: 'popup window will be shown wider, with a wider input field',
                 typeList: [ARGUMENT_TYPE.BOOLEAN],
                 defaultValue: 'off',
                 enumList: commonEnumProviders.boolean('onOff')(),
@@ -1314,7 +1314,7 @@ export function initDefaultSlashCommands() {
             }),
             SlashCommandNamedArgument.fromProps({
                 name: 'rows',
-                description: 'number of rows for the input field',
+                description: 'number of rows for the input field (lines being displayed)',
                 typeList: [ARGUMENT_TYPE.NUMBER],
             }),
             SlashCommandNamedArgument.fromProps({
