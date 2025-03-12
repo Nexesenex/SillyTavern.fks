@@ -1400,6 +1400,7 @@ export async function selectCharacterById(id) {
     } else {
         //if clicked on character that was already selected
         selected_button = 'character_edit';
+        await unshallowCharacter(this_chid);
         select_selected_character(this_chid);
     }
 }
