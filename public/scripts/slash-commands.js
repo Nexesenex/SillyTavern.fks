@@ -2136,8 +2136,8 @@ function injectCallback(args, value) {
         'assistant': extension_prompt_roles.ASSISTANT,
     };
 
-    const id = String(args?.id);
-    const ephemeral = isTrueBoolean(String(args?.ephemeral));
+    const id = String(args?.id ?? '');
+    const ephemeral = isTrueBoolean(String(args?.ephemeral ?? ''));
 
     if (!id) {
         console.warn('WARN: No ID provided for /inject command');
