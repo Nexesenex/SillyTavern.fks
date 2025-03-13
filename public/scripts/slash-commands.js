@@ -3628,14 +3628,14 @@ export async function sendMessageAs(args, text) {
     if (!isNaN(insertAt) && insertAt >= 0 && insertAt <= chat.length) {
         chat.splice(insertAt, 0, message);
         await saveChatConditional();
-        await eventSource.emit(event_types.MESSAGE_RECEIVED, insertAt);
+        await eventSource.emit(event_types.MESSAGE_RECEIVED, insertAt, 'command');
         await reloadCurrentChat();
-        await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, insertAt);
+        await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, insertAt, 'command');
     } else {
         chat.push(message);
-        await eventSource.emit(event_types.MESSAGE_RECEIVED, (chat.length - 1));
+        await eventSource.emit(event_types.MESSAGE_RECEIVED, (chat.length - 1), 'command');
         addOneMessage(message);
-        await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, (chat.length - 1));
+        await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, (chat.length - 1), 'command');
         await saveChatConditional();
     }
 
