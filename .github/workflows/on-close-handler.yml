@@ -1,4 +1,4 @@
-name: 🎯 Issues/PRs On Close Handler
+name: 🚪 Issues/PRs On Close Handler
 
 on:
   issues:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   remove-labels:
-    name: Remove Pending Labels on Close
+    name: 🗑️ Remove Pending Labels on Close
     runs-on: ubuntu-latest
 
     steps:

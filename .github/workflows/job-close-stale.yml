@@ -1,4 +1,4 @@
-name: 🎯 Close Stale Issues/PRs Workflow
+name: 🕒 Close Stale Issues/PRs Workflow
 
 on:
   # Run the workflow every day
@@ -8,7 +8,7 @@ on:
 
 jobs:
   mark-inactivity:
-    name: Mark Issues/PRs without Activity
+    name: ⏳ Mark Issues/PRs without Activity
     runs-on: ubuntu-latest
 
     steps:
@@ -41,7 +41,7 @@ jobs:
           exempt-pr-labels: '📌 Keep Open'
 
   await-user-response:
-    name: Mark Issues/PRs Awaiting User Response
+    name: ⚠️ Mark Issues/PRs Awaiting User Response
     runs-on: ubuntu-latest
     needs: mark-inactivity
 
@@ -68,7 +68,7 @@ jobs:
           exempt-issue-labels: '🚧 Alternative Exists'
 
   alternative-exists:
-    name: Mark Issues with Alternative Exists
+    name: 🔄 Mark Issues with Alternative Exists
     runs-on: ubuntu-latest
     needs: await-user-response
 

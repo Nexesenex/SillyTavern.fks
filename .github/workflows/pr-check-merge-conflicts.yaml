@@ -1,4 +1,4 @@
-name: 🎯 Check Merge Conflicts
+name: ⚔️ Check Merge Conflicts
 
 on:
   # So that PRs touching the same files as the push are updated
@@ -9,7 +9,7 @@ on:
 
 jobs:
   check-merge-conflicts:
-    name: Check Merge Conflicts
+    name: ⚔️ Check Merge Conflicts
     runs-on: ubuntu-latest
 
     steps:

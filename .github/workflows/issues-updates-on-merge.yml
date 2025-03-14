@@ -1,4 +1,4 @@
-name: 🎯 Update Issues on Push
+name: 🔄 Update Issues on Push
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   # This runs commits to staging/release, reading the commit messages. Check `pr-auto-manager.yml`:`update-linked-issues` for PR-linked updates.
   update-linked-issues:
-    name: Update Issues on Push
+    name: 🔗 Mark Linked Issues Done on Push
     runs-on: ubuntu-latest
 
     steps:

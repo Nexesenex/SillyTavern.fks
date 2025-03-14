@@ -1,4 +1,4 @@
-name: 🎯 Issues Manager
+name: 🛠️ Issues Manager
 
 on:
   issues:
@@ -9,10 +9,15 @@ on:
 
 jobs:
   label-on-content:
-    name: Auto-Label Issues (Based on Issue Content)
+    name: 🏷️ Label Issues by Content
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        # Checkout
+        # https://github.com/marketplace/actions/checkout
+        uses: actions/checkout@v4
+
       - name: Auto-Label Issues (Based on Issue Content)
         # only auto label based on issue content once, on open (to prevent re-labeling removed labels)
         if: github.event.action == 'opened'
@@ -26,7 +31,7 @@ jobs:
           repo-token: ${{ secrets.BOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
 
   label-on-labels:
-    name: Auto-Label Issues (Based on Issue Labels)
+    name: 🏷️ Label Issues by Labels
     runs-on: ubuntu-latest
 
     steps:
@@ -71,7 +76,7 @@ jobs:
           labels: '✖️ Not Reproducible,✖️ Not A Bug'
 
   remove-stale-label:
-    name: Remove Stale Label on Comment
+    name: 🗑️ Remove Stale Label on Comment
     runs-on: ubuntu-latest
     # Only run this on new comments, to automatically remove the stale label
     if: github.event_name == 'issue_comment' && github.actor != 'github-actions[bot]'
@@ -88,7 +93,7 @@ jobs:
           labels: '⚰️ Stale,🕸️ Inactive,🚏 Awaiting User Response,🛑 No Response'
 
   write-auto-comments:
-    name: Post Issue Comments Based on Labels
+    name: 💬 Post Issue Comments Based on Labels
     needs: [label-on-content, label-on-labels]
     runs-on: ubuntu-latest
 
