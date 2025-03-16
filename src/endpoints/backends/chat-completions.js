@@ -358,7 +358,7 @@ async function sendMakerSuiteRequest(request, response) {
             delete generationConfig.stopSequences;
         }
 
-        const useMultiModal = requestImages && (model.includes('gemini-2.0-flash-exp'));
+        const useMultiModal = requestImages && ['gemini-2.0-flash-exp', 'gemini-2.0-flash-exp-image-generation'].includes(model);
         if (useMultiModal) {
             generationConfig.responseModalities = ['text', 'image'];
         }
@@ -381,7 +381,7 @@ async function sendMakerSuiteRequest(request, response) {
             safetySettings = GEMINI_SAFETY.map(setting => ({ ...setting, threshold: 'BLOCK_NONE' }));
         }
         // Interestingly, Gemini 2.0 Flash does support setting the threshold for HARM_CATEGORY_CIVIC_INTEGRITY to OFF.
-        else if (['gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-2.0-flash-exp'].includes(model)) {
+        else if (['gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-2.0-flash-exp', 'gemini-2.0-flash-exp-image-generation'].includes(model)) {
             safetySettings = GEMINI_SAFETY.map(setting => ({ ...setting, threshold: 'OFF' }));
         }
         // Most of the other models allow for setting the threshold of filters, except for HARM_CATEGORY_CIVIC_INTEGRITY, to OFF.

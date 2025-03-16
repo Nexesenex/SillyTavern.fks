@@ -6861,14 +6861,14 @@ export function buildAvatarList(block, entities, { templateId = 'inline_avatar_t
  */
 export async function unshallowCharacter(characterId) {
     if (characterId === undefined) {
-        console.warn('Undefined character cannot be unshallowed');
+        console.debug('Undefined character cannot be unshallowed');
         return;
     }
 
     /** @type {import('./scripts/char-data.js').v1CharData} */
     const character = characters[characterId];
     if (!character) {
-        console.warn('Character not found:', characterId);
+        console.debug('Character not found:', characterId);
         return;
     }
 
@@ -6879,7 +6879,7 @@ export async function unshallowCharacter(characterId) {
 
     const avatar = character.avatar;
     if (!avatar) {
-        console.warn('Character has no avatar field:', characterId);
+        console.debug('Character has no avatar field:', characterId);
         return;
     }
 

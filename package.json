@@ -90,11 +90,11 @@
         "type": "git",
         "url": "https://github.com/SillyTavern/SillyTavern.git"
     },
-    "version": "1.12.12",
+    "version": "1.12.13",
     "scripts": {
         "start": "node server.js",
         "debug": "node --inspect server.js",
-        "electron": "electron ./src/electron",
+        "start:electron": "cd ./src/electron && npm run start",
         "start:deno": "deno run --allow-run --allow-net --allow-read --allow-write --allow-sys --allow-env server.js",
         "start:bun": "bun server.js",
         "start:no-csrf": "node server.js --disableCsrf",

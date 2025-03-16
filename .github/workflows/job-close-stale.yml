@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: '0 0 * * *' # Runs every day at midnight UTC
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   mark-inactivity:
     name: ⏳ Mark Issues/PRs without Activity
@@ -15,7 +20,7 @@ jobs:
       - name: Mark Issues/PRs without Activity
         # Close Stale Issues and PRs
         # https://github.com/marketplace/actions/close-stale-issues
-        uses: actions/stale@v9
+        uses: actions/stale@v9.1.0
         with:
           repo-token: ${{ secrets.BOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           days-before-stale: 183
@@ -49,7 +54,7 @@ jobs:
       - name: Mark Issues/PRs Awaiting User Response
         # Close Stale Issues and PRs
         # https://github.com/marketplace/actions/close-stale-issues
-        uses: actions/stale@v9
+        uses: actions/stale@v9.1.0
         with:
           repo-token: ${{ secrets.BOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           days-before-stale: 7
@@ -76,7 +81,7 @@ jobs:
       - name: Mark Issues with Alternative Exists
         # Close Stale Issues and PRs
         # https://github.com/marketplace/actions/close-stale-issues
-        uses: actions/stale@v9
+        uses: actions/stale@v9.1.0
         with:
           repo-token: ${{ secrets.BOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           days-before-stale: 7
