@@ -19,7 +19,7 @@ jobs:
       - name: Label PR Size
         # Pull Request Size Labeler
         # https://github.com/marketplace/actions/pull-request-size-labeler
-        uses: codelytv/pr-size-labeler@v1.10.2
+        uses: codelytv/pr-size-labeler@v1.10.1
         with:
           GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           xs_label: '🟩 ⬤○○○○'

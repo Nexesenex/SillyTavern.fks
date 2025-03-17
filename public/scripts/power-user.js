@@ -225,7 +225,9 @@ let power_user = {
         system_sequence: '',
         system_suffix: '',
         last_system_sequence: '',
+        first_input_sequence: '',
         first_output_sequence: '',
+        last_input_sequence: '',
         last_output_sequence: '',
         system_sequence_prefix: '',
         system_sequence_suffix: '',
@@ -1990,15 +1992,21 @@ export function fuzzySearchGroups(searchValue, fuzzySearchCaches = null) {
 /**
  * Renders a story string template with the given parameters.
  * @param {object} params Template parameters.
+ * @param {object} [options] Additional options.
+ * @param {string} [options.customStoryString] Custom story string template.
+ * @param {InstructSettings} [options.customInstructSettings] Custom instruct settings.
  * @returns {string} The rendered story string.
  */
-export function renderStoryString(params) {
+export function renderStoryString(params, { customStoryString = null, customInstructSettings = null } = {}) {
     try {
+        const storyString = customStoryString ?? power_user.context.story_string;
+        const instructSettings = structuredClone(customInstructSettings ?? power_user.instruct);
+
         // Validate and log possible warnings/errors
-        validateStoryString(power_user.context.story_string, params);
+        validateStoryString(storyString, params);
 
         // compile the story string template into a function, with no HTML escaping
-        const compiledTemplate = Handlebars.compile(power_user.context.story_string, { noEscape: true });
+        const compiledTemplate = Handlebars.compile(storyString, { noEscape: true });
 
         // render the story string template with the given params
         let output = compiledTemplate(params);
@@ -2011,7 +2019,7 @@ export function renderStoryString(params) {
 
         // add a newline to the end of the story string if it doesn't have one
         if (output.length > 0 && !output.endsWith('\n')) {
-            if (!power_user.instruct.enabled || power_user.instruct.wrap) {
+            if (!instructSettings.enabled || instructSettings.wrap) {
                 output += '\n';
             }
         }
@@ -4234,14 +4242,13 @@ $(document).ready(() => {
         ],
         callback: (args, value) => {
             const force = isTrueBoolean(String(args?.force ?? false));
-            value = String(value ?? '').trim();
 
             // Skip processing if no value and not forced
             if (!force && !value) {
                 return power_user.user_prompt_bias;
             }
 
-            power_user.user_prompt_bias = value;
+            power_user.user_prompt_bias = String(value ?? '');
             $('#start_reply_with').val(power_user.user_prompt_bias);
             saveSettingsDebounced();
 

@@ -49,6 +49,7 @@ import {
     clearChat,
     unshallowCharacter,
     deleteLastMessage,
+    getCharacterCardFields,
 } from '../script.js';
 import {
     extension_settings,
@@ -78,8 +79,9 @@ import { ToolManager } from './tool-calling.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { timestampToMoment, uuidv4 } from './utils.js';
 import { getGlobalVariable, getLocalVariable, setGlobalVariable, setLocalVariable } from './variables.js';
-import { convertCharacterBook, loadWorldInfo, saveWorldInfo, updateWorldInfoList } from './world-info.js';
+import { convertCharacterBook, getWorldInfoPrompt, loadWorldInfo, saveWorldInfo, updateWorldInfoList } from './world-info.js';
 import { ChatCompletionService, TextCompletionService } from './custom-request.js';
+import { ConnectionManagerRequestService } from './extensions/shared.js';
 import { updateReasoningUI, parseReasoningFromString } from './reasoning.js';
 
 export function getContext() {
@@ -188,6 +190,7 @@ export function getContext() {
         textCompletionSettings: textgenerationwebui_settings,
         powerUserSettings: power_user,
         getCharacters,
+        getCharacterCardFields,
         uuidv4,
         humanizedDateTime,
         updateMessageBlock,
@@ -206,6 +209,7 @@ export function getContext() {
         saveWorldInfo,
         updateWorldInfoList,
         convertCharacterBook,
+        getWorldInfoPrompt,
         CONNECT_API_MAP,
         getTextGenServer,
         extractMessageFromData,
@@ -215,6 +219,7 @@ export function getContext() {
         clearChat,
         ChatCompletionService,
         TextCompletionService,
+        ConnectionManagerRequestService,
         updateReasoningUI,
         parseReasoningFromString,
         unshallowCharacter,

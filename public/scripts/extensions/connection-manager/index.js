@@ -1,4 +1,4 @@
-import { Fuse } from '../../../lib.js';
+import { DOMPurify, Fuse } from '../../../lib.js';
 
 import { event_types, eventSource, main_api, saveSettingsDebounced } from '../../../script.js';
 import { extension_settings, renderExtensionTemplateAsync } from '../../extensions.js';
@@ -267,9 +267,14 @@ async function createConnectionProfile(forceName = null) {
     });
     const isNameTaken = (n) => extension_settings.connectionManager.profiles.some(p => p.name === n);
     const suggestedName = getUniqueName(collapseSpaces(`${profile.api ?? ''} ${profile.model ?? ''} - ${profile.preset ?? ''}`), isNameTaken);
-    const name = forceName ?? await callGenericPopup(template, POPUP_TYPE.INPUT, suggestedName, { rows: 2 });
-
+    let name = forceName ?? await callGenericPopup(template, POPUP_TYPE.INPUT, suggestedName, { rows: 2 });
+    // If it's cancelled, it will be false
     if (!name) {
+        return null;
+    }
+    name = DOMPurify.sanitize(String(name));
+    if (!name) {
+        toastr.error('Name cannot be empty.');
         return null;
     }
 
@@ -303,7 +308,8 @@ async function deleteConnectionProfile() {
         return;
     }
 
-    const name = extension_settings.connectionManager.profiles[index].name;
+    const profile = extension_settings.connectionManager.profiles[index];
+    const name = profile.name;
     const confirm = await Popup.show.confirm(t`Are you sure you want to delete the selected profile?`, name);
 
     if (!confirm) {
@@ -313,6 +319,8 @@ async function deleteConnectionProfile() {
     extension_settings.connectionManager.profiles.splice(index, 1);
     extension_settings.connectionManager.selectedProfile = null;
     saveSettingsDebounced();
+
+    await eventSource.emit(event_types.CONNECTION_PROFILE_DELETED, profile);
 }
 
 /**
@@ -512,6 +520,7 @@ async function renderDetailsContent(detailsContent) {
         saveSettingsDebounced();
         renderConnectionProfiles(profiles);
         await renderDetailsContent(detailsContent);
+        await eventSource.emit(event_types.CONNECTION_PROFILE_CREATED, profile);
         await eventSource.emit(event_types.CONNECTION_PROFILE_LOADED, profile.name);
     });
 
@@ -523,9 +532,11 @@ async function renderDetailsContent(detailsContent) {
             console.log('No profile selected');
             return;
         }
+        const oldProfile = structuredClone(profile);
         await updateConnectionProfile(profile);
         await renderDetailsContent(detailsContent);
         saveSettingsDebounced();
+        await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, profile);
         await eventSource.emit(event_types.CONNECTION_PROFILE_LOADED, profile.name);
         toastr.success('Connection profile updated', '', { timeOut: 1500 });
     });
@@ -559,7 +570,7 @@ async function renderDetailsContent(detailsContent) {
             return acc;
         }, {});
         const template = $(await renderExtensionTemplateAsync(MODULE_NAME, 'edit', { name: profile.name, settings }));
-        const newName = await callGenericPopup(template, POPUP_TYPE.INPUT, profile.name, {
+        let newName = await callGenericPopup(template, POPUP_TYPE.INPUT, profile.name, {
             rows: 2,
             customButtons: [{
                 text: t`Save and Update`,
@@ -571,7 +582,13 @@ async function renderDetailsContent(detailsContent) {
             }],
         });
 
+        // If it's cancelled, it will be false
         if (!newName) {
+            return;
+        }
+        newName = DOMPurify.sanitize(String(newName));
+        if (!newName) {
+            toastr.error('Name cannot be empty.');
             return;
         }
 
@@ -584,6 +601,7 @@ async function renderDetailsContent(detailsContent) {
             return Object.entries(FANCY_NAMES).find(x => x[1] === String($(this).val()))?.[0];
         }).get();
 
+        const oldProfile = structuredClone(profile);
         if (newExcludeList.length !== profile.exclude.length || !newExcludeList.every(e => profile.exclude.includes(e))) {
             profile.exclude = newExcludeList;
             for (const command of newExcludeList) {
@@ -598,10 +616,11 @@ async function renderDetailsContent(detailsContent) {
 
         if (profile.name !== newName) {
             toastr.success('Connection profile renamed.');
-            profile.name = String(newName);
+            profile.name = newName;
         }
 
         saveSettingsDebounced();
+        await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, profile);
         renderConnectionProfiles(profiles);
         await renderDetailsContent(detailsContent);
     });
@@ -704,6 +723,7 @@ async function renderDetailsContent(detailsContent) {
             saveSettingsDebounced();
             renderConnectionProfiles(profiles);
             await renderDetailsContent(detailsContent);
+            await eventSource.emit(event_types.CONNECTION_PROFILE_CREATED, profile);
             return profile.name;
         },
     }));
@@ -718,9 +738,11 @@ async function renderDetailsContent(detailsContent) {
                 toastr.warning('No profile selected.');
                 return '';
             }
+            const oldProfile = structuredClone(profile);
             await updateConnectionProfile(profile);
             await renderDetailsContent(detailsContent);
             saveSettingsDebounced();
+            await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, profile);
             return profile.name;
         },
     }));

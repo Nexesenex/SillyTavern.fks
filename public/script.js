@@ -514,6 +514,9 @@ export const event_types = {
     ONLINE_STATUS_CHANGED: 'online_status_changed',
     IMAGE_SWIPED: 'image_swiped',
     CONNECTION_PROFILE_LOADED: 'connection_profile_loaded',
+    CONNECTION_PROFILE_CREATED: 'connection_profile_created',
+    CONNECTION_PROFILE_DELETED: 'connection_profile_deleted',
+    CONNECTION_PROFILE_UPDATED: 'connection_profile_updated',
     TOOL_CALLS_PERFORMED: 'tool_calls_performed',
     TOOL_CALLS_RENDERED: 'tool_calls_rendered',
 };
@@ -1370,8 +1373,11 @@ export function resultCheckStatus() {
  * If the character ID doesn't exist, if the chat is being saved, or if a group is being generated, this function does nothing.
  * If the character is different from the currently selected one, it will clear the chat and reset any selected character or group.
  * @param {number} id The ID of the character to switch to.
+ * @param {object} [options] Options for the switch.
+ * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the character edit menu if the character is already selected.
+ * @returns {Promise<void>} A promise that resolves when the character is switched.
  */
-export async function selectCharacterById(id) {
+export async function selectCharacterById(id, { switchMenu = true } = {}) {
     if (characters[id] === undefined) {
         return;
     }
@@ -1400,9 +1406,9 @@ export async function selectCharacterById(id) {
         }
     } else {
         //if clicked on character that was already selected
-        selected_button = 'character_edit';
+        switchMenu && (selected_button = 'character_edit');
         await unshallowCharacter(this_chid);
-        select_selected_character(this_chid);
+        select_selected_character(this_chid, { switchMenu });
     }
 }
 
@@ -1787,6 +1793,7 @@ export async function getCharacters() {
         body: JSON.stringify({}),
     });
     if (response.ok === true) {
+        const previousAvatar = this_chid !== undefined ? characters[this_chid]?.avatar : null;
         characters.splice(0, characters.length);
         const getData = await response.json();
         for (let i = 0; i < getData.length; i++) {
@@ -1800,8 +1807,16 @@ export async function getCharacters() {
 
             characters[i]['chat'] = String(characters[i]['chat']);
         }
-        if (this_chid !== undefined) {
-            $('#avatar_url_pole').val(characters[this_chid].avatar);
+
+        if (previousAvatar) {
+            const newCharacterId = characters.findIndex(x => x.avatar === previousAvatar);
+            if (newCharacterId >= 0) {
+                setCharacterId(newCharacterId);
+                await selectCharacterById(newCharacterId, { switchMenu: false });
+            } else {
+                await Popup.show.text(t`ERROR: The active character is no longer available.`, t`The page will be refreshed to prevent data loss. Press "OK" to continue.`);
+                return location.reload();
+            }
         }
 
         await getGroups();
@@ -6527,6 +6542,8 @@ export async function renameCharacter(name = null, { silent = false, renameChats
 
             await eventSource.emit(event_types.CHARACTER_RENAMED, oldAvatar, newAvatar);
 
+            // Unload current character
+            setCharacterId(undefined);
             // Reload characters list
             await getCharacters();
 
@@ -6535,7 +6552,6 @@ export async function renameCharacter(name = null, { silent = false, renameChats
 
             if (newChId !== -1) {
                 // Select the character after the renaming
-                setCharacterId(undefined);
                 await selectCharacterById(newChId);
 
                 // Async delay to update UI
@@ -7882,14 +7898,19 @@ export function select_rm_info(type, charId, previousCharId = null) {
     }
 }
 
-export function select_selected_character(chid) {
+/**
+ * Selects the right menu for displaying the character editor.
+ * @param {number|string} chid Character array index
+ * @param {object} [param1] Options for the switch
+ * @param {boolean} [param1.switchMenu=true] Whether to switch the menu
+ */
+export function select_selected_character(chid, { switchMenu = true } = {}) {
     //character select
     //console.log('select_selected_character() -- starting with input of -- ' + chid + ' (name:' + characters[chid].name + ')');
-    select_rm_create();
-    setMenuType('character_edit');
+    select_rm_create({ switchMenu });
+    switchMenu && setMenuType('character_edit');
     $('#delete_button').css('display', 'flex');
     $('#export_button').css('display', 'flex');
-    var display_name = characters[chid].name;
 
     //create text poles
     $('#rm_button_back').css('display', 'none');
@@ -7904,7 +7925,7 @@ export function select_selected_character(chid) {
 
     // Don't update the navbar name if we're peeking the group member defs
     if (!selected_group) {
-        $('#rm_button_selected_ch').children('h2').text(display_name);
+        $('#rm_button_selected_ch').children('h2').text(characters[chid].name);
     }
 
     $('#add_avatar_button').val('');
@@ -7935,21 +7956,19 @@ export function select_selected_character(chid) {
     $('#chat_import_avatar_url').val(characters[chid].avatar);
     $('#chat_import_character_name').val(characters[chid].name);
     $('#character_json_data').val(characters[chid].json_data);
-    let this_avatar = default_avatar;
-    if (characters[chid].avatar != 'none') {
-        this_avatar = getThumbnailUrl('avatar', characters[chid].avatar);
-    }
 
     updateFavButtonState(characters[chid].fav || characters[chid].fav == 'true');
 
-    $('#avatar_load_preview').attr('src', this_avatar);
-    $('#name_div').removeClass('displayBlock');
-    $('#name_div').addClass('displayNone');
-    $('#renameCharButton').css('display', '');
+    const avatarUrl = characters[chid].avatar != 'none' ? getThumbnailUrl('avatar', characters[chid].avatar) : default_avatar;
+    $('#avatar_load_preview').attr('src', avatarUrl);
     $('.open_alternate_greetings').data('chid', chid);
     $('#set_character_world').data('chid', chid);
     setWorldInfoButtonClass(chid);
     checkEmbeddedWorld(chid);
+
+    $('#name_div').removeClass('displayBlock');
+    $('#name_div').addClass('displayNone');
+    $('#renameCharButton').css('display', '');
 
     $('#form_create').attr('actiontype', 'editcharacter');
     $('.form_create_bottom_buttons_block .chat_lorebook_button').show();
@@ -7962,8 +7981,13 @@ export function select_selected_character(chid) {
     saveSettingsDebounced();
 }
 
-function select_rm_create() {
-    setMenuType('create');
+/**
+ * Selects the right menu for creating a new character.
+ * @param {object} [options] Options for the switch
+ * @param {boolean} [options.switchMenu=true] Whether to switch the menu
+ */
+function select_rm_create({ switchMenu = true } = {}) {
+    switchMenu && setMenuType('create');
 
     //console.log('select_rm_Create() -- selected button: '+selected_button);
     if (selected_button == 'create') {
@@ -7973,7 +7997,7 @@ function select_rm_create() {
         }
     }
 
-    selectRightMenuWithAnimation('rm_ch_create_block');
+    switchMenu && selectRightMenuWithAnimation('rm_ch_create_block');
 
     $('#set_chat_scenario').hide();
     $('#delete_button_div').css('display', 'none');
@@ -9196,6 +9220,17 @@ function swipe_right(_event, { source, repeated } = {}) {
     }
 }
 
+/**
+ * @typedef {object} ConnectAPIMap
+ * @property {string} selected - API name (e.g. "textgenerationwebui", "openai")
+ * @property {string?} [button] - CSS selector for the API button
+ * @property {string?} [type] - API type, mostly used by text completion. (e.g. "openrouter")
+ * @property {string?} [source] - API source, mostly used by chat completion. (e.g. "openai")
+ */
+
+/**
+ * @type {Record<string, ConnectAPIMap>}
+ */
 export const CONNECT_API_MAP = {
     // Default APIs not contined inside text gen / chat gen
     'kobold': {

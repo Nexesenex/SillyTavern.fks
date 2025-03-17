@@ -705,16 +705,18 @@ export function parseExampleIntoIndividual(messageExampleString, appendNamesForG
     return result;
 }
 
-function formatWorldInfo(value) {
+export function formatWorldInfo(value, { wiFormat = null } = {}) {
     if (!value) {
         return '';
     }
 
-    if (!oai_settings.wi_format.trim()) {
+    const format = wiFormat ?? oai_settings.wi_format;
+
+    if (!format.trim()) {
         return value;
     }
 
-    return stringFormat(oai_settings.wi_format, value);
+    return stringFormat(format, value);
 }
 
 /**
@@ -952,7 +954,7 @@ async function populateDialogueExamples(prompts, chatCompletion, messageExamples
  * @param {number} position - Prompt position in the extensions object.
  * @returns {string|false} - The prompt position for prompt collection.
  */
-function getPromptPosition(position) {
+export function getPromptPosition(position) {
     if (position == extension_prompt_types.BEFORE_PROMPT) {
         return 'start';
     }
@@ -969,7 +971,7 @@ function getPromptPosition(position) {
  * @param {number} role Role of the prompt.
  * @returns {string} Mapped role.
  */
-function getPromptRole(role) {
+export function getPromptRole(role) {
     switch (role) {
         case extension_prompt_roles.SYSTEM:
             return 'system';

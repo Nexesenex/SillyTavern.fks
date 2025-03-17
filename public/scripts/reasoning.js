@@ -57,19 +57,24 @@ function toggleReasoningAutoExpand() {
  * @param {object} data Response data
  * @returns {string} Extracted reasoning
  */
-export function extractReasoningFromData(data) {
-    switch (main_api) {
+export function extractReasoningFromData(data, {
+    mainApi = null,
+    ignoreShowThoughts = false,
+    textGenType = null,
+    chatCompletionSource = null
+} = {}) {
+    switch (mainApi ?? main_api) {
         case 'textgenerationwebui':
-            switch (textgenerationwebui_settings.type) {
+            switch (textGenType ?? textgenerationwebui_settings.type) {
                 case textgen_types.OPENROUTER:
                     return data?.choices?.[0]?.reasoning ?? '';
             }
             break;
 
         case 'openai':
-            if (!oai_settings.show_thoughts) break;
+            if (!ignoreShowThoughts && !oai_settings.show_thoughts) break;
 
-            switch (oai_settings.chat_completion_source) {
+            switch (chatCompletionSource ?? oai_settings.chat_completion_source) {
                 case chat_completion_sources.DEEPSEEK:
                     return data?.choices?.[0]?.message?.reasoning_content ?? '';
                 case chat_completion_sources.OPENROUTER:
