@@ -3193,6 +3193,7 @@
                                         <option value="mistral-small-latest">mistral-small-latest</option>
                                         <option value="mistral-medium-latest">mistral-medium-latest</option>
                                         <option value="mistral-large-latest">mistral-large-latest</option>
+                                        <option value="mistral-saba-latest">mistral-saba-latest</option>
                                         <option value="codestral-latest">codestral-latest</option>
                                         <option value="codestral-mamba-latest">codestral-mamba-latest</option>
                                         <option value="pixtral-12b-latest">pixtral-12b-latest</option>
@@ -3208,13 +3209,20 @@
                                         <option value="mistral-small-2312">mistral-small-2312</option>
                                         <option value="mistral-small-2402">mistral-small-2402</option>
                                         <option value="mistral-small-2409">mistral-small-2409</option>
+                                        <option value="mistral-small-2501">mistral-small-2501</option>
+                                        <option value="mistral-small-2503">mistral-small-2503</option>
                                         <option value="mistral-medium-2312">mistral-medium-2312</option>
                                         <option value="mistral-large-2402">mistral-large-2402</option>
                                         <option value="mistral-large-2407">mistral-large-2407</option>
                                         <option value="mistral-large-2411">mistral-large-2411</option>
+                                        <option value="mistral-large-pixtral-2411">mistral-large-pixtral-2411</option>
+                                        <option value="mistral-saba-2502">mistral-saba-2502</option>
                                         <option value="codestral-2405">codestral-2405</option>
                                         <option value="codestral-2405-blue">codestral-2405-blue</option>
                                         <option value="codestral-mamba-2407">codestral-mamba-2407</option>
+                                        <option value="codestral-2411-rc5">codestral-2411-rc5</option>
+                                        <option value="codestral-2412">codestral-2412</option>
+                                        <option value="codestral-2501">codestral-2501</option>
                                         <option value="pixtral-12b-2409">pixtral-12b-2409</option>
                                         <option value="pixtral-large-2411">pixtral-large-2411</option>
                                     </optgroup>
@@ -3417,7 +3425,7 @@
                         </form>
                         <div id="01ai_form" data-source="01ai">
                             <h4>
-                                <a data-i18n="01.AI API Key" href="https://platform.01.ai/" target="_blank" rel="noopener noreferrer">
+                                <a data-i18n="01.AI API Key" href="https://platform.lingyiwanwu.com/" target="_blank" rel="noopener noreferrer">
                                     01.AI API Key
                                 </a>
                             </h4>
@@ -3917,6 +3925,19 @@
                                     <summary data-i18n="Reasoning Formatting">
                                         Reasoning Formatting
                                     </summary>
+                                    <div class="flex-container" title="Select your current Reasoning Template" data-i18n="[title]Select your current Reasoning Template">
+                                        <select id="reasoning_select" data-preset-manager-for="reasoning" class="flex1 text_pole"></select>
+                                        <div class="flex-container margin0 justifyCenter gap3px">
+                                            <input type="file" hidden data-preset-manager-file="reasoning" accept=".json, .settings">
+                                            <i data-preset-manager-update="reasoning" class="menu_button fa-solid fa-save" title="Update current template" data-i18n="[title]Update current template"></i>
+                                            <i data-preset-manager-rename="reasoning" class="menu_button fa-pencil fa-solid" title="Rename current template" data-i18n="[title]Rename current template"></i>
+                                            <i data-preset-manager-new="reasoning" class="menu_button fa-solid fa-file-circle-plus" title="Save template as" data-i18n="[title]Save template as"></i>
+                                            <i data-preset-manager-import="reasoning" class="displayNone menu_button fa-solid fa-file-import" title="Import template" data-i18n="[title]Import template"></i>
+                                            <i data-preset-manager-export="reasoning" class="displayNone menu_button fa-solid fa-file-export" title="Export template" data-i18n="[title]Export template"></i>
+                                            <i data-preset-manager-restore="reasoning" class="menu_button fa-solid fa-recycle" title="Restore current template" data-i18n="[title]Restore current template"></i>
+                                            <i data-preset-manager-delete="reasoning" class="menu_button fa-solid fa-trash-can" title="Delete template" data-i18n="[title]Delete template"></i>
+                                        </div>
+                                    </div>
                                     <div class="flex-container">
                                         <div class="flex1" title="Inserted before the reasoning content." data-i18n="[title]reasoning_prefix">
                                             <small data-i18n="Prefix">Prefix</small>

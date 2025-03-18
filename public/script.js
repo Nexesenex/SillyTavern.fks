@@ -172,6 +172,7 @@ import {
     copyText,
     escapeHtml,
     saveBase64AsFile,
+    uuidv4,
 } from './scripts/utils.js';
 import { debounce_timeout } from './scripts/constants.js';
 
@@ -2745,6 +2746,7 @@ export function substituteParams(content, _name1, _name2, _original, _group, _re
         environment.mesExamplesRaw = fields.mesExamples || '';
         environment.charVersion = fields.version || '';
         environment.char_version = fields.version || '';
+        environment.charDepthPrompt = fields.charDepthPrompt || '';
     }
 
     // Must be substituted last so that they're replaced inside {{description}}
@@ -3096,10 +3098,30 @@ export function baseChatReplace(value, name1, name2) {
 
 /**
  * Returns the character card fields for the current character.
- * @returns {{system: string, mesExamples: string, description: string, personality: string, persona: string, scenario: string, jailbreak: string, version: string}}
+ * @typedef {object} CharacterCardFields
+ * @property {string} system System prompt
+ * @property {string} mesExamples Message examples
+ * @property {string} description Description
+ * @property {string} personality Personality
+ * @property {string} persona Persona
+ * @property {string} scenario Scenario
+ * @property {string} jailbreak Jailbreak instructions
+ * @property {string} version Character version
+ * @property {string} charDepthPrompt Character depth note
+ * @returns {CharacterCardFields} Character card fields
  */
 export function getCharacterCardFields() {
-    const result = { system: '', mesExamples: '', description: '', personality: '', persona: '', scenario: '', jailbreak: '', version: '' };
+    const result = {
+        system: '',
+        mesExamples: '',
+        description: '',
+        personality: '',
+        persona: '',
+        scenario: '',
+        jailbreak: '',
+        version: '',
+        charDepthPrompt: '',
+    };
     result.persona = baseChatReplace(power_user.persona_description?.trim(), name1, name2);
 
     const character = characters[this_chid];
@@ -3116,6 +3138,7 @@ export function getCharacterCardFields() {
     result.system = power_user.prefer_character_prompt ? baseChatReplace(character.data?.system_prompt?.trim(), name1, name2) : '';
     result.jailbreak = power_user.prefer_character_jailbreak ? baseChatReplace(character.data?.post_history_instructions?.trim(), name1, name2) : '';
     result.version = character.data?.character_version ?? '';
+    result.charDepthPrompt = baseChatReplace(character.data?.extensions?.depth_prompt?.prompt?.trim(), name1, name2);
 
     if (selected_group) {
         const groupCards = getGroupCharacterCards(selected_group, Number(this_chid));
@@ -3611,7 +3634,8 @@ export async function generateRaw(prompt, api, instructOverride, quietToLoud, sy
             throw new Error(data.response);
         }
 
-        const message = cleanUpMessage(extractMessageFromData(data), false, false, true);
+        // format result, exclude user prompt bias
+        const message = cleanUpMessage(extractMessageFromData(data), false, false, true, null, false);
 
         if (!message) {
             throw new Error('No message generated');
@@ -3920,6 +3944,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         mesExamples,
         system,
         jailbreak,
+        charDepthPrompt,
     } = getCharacterCardFields();
 
     if (main_api !== 'openai') {
@@ -3942,7 +3967,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             setExtensionPrompt('DEPTH_PROMPT_' + index, value.text, extension_prompt_types.IN_CHAT, value.depth, extension_settings.note.allowWIScan, role);
         });
     } else {
-        const depthPromptText = baseChatReplace(characters[this_chid]?.data?.extensions?.depth_prompt?.prompt?.trim(), name1, name2) || '';
+        const depthPromptText = charDepthPrompt || '';
         const depthPromptDepth = characters[this_chid]?.data?.extensions?.depth_prompt?.depth ?? depth_prompt_depth_default;
         const depthPromptRole = getExtensionPromptRoleByName(characters[this_chid]?.data?.extensions?.depth_prompt?.role ?? depth_prompt_role_default);
         setExtensionPrompt('DEPTH_PROMPT', depthPromptText, extension_prompt_types.IN_CHAT, depthPromptDepth, extension_settings.note.allowWIScan, depthPromptRole);
@@ -5883,13 +5908,14 @@ function extractMultiSwipes(data, type) {
     return swipes;
 }
 
-export function cleanUpMessage(getMessage, isImpersonate, isContinue, displayIncompleteSentences = false, stoppingStrings = null) {
+export function cleanUpMessage(getMessage, isImpersonate, isContinue, displayIncompleteSentences = false, stoppingStrings = null, includeUserPromptBias = true) {
     if (!getMessage) {
         return '';
     }
 
     // Add the prompt bias before anything else
     if (
+        includeUserPromptBias &&
         power_user.user_prompt_bias &&
         !isImpersonate &&
         !isContinue &&
@@ -6745,7 +6771,22 @@ export function saveChatDebounced() {
     }, DEFAULT_SAVE_EDIT_TIMEOUT);
 }
 
-export async function saveChat(chatName, withMetadata, mesId) {
+/**
+ * Saves the chat to the server.
+ * @param {object} [options] - Additional options.
+ * @param {string} [options.chatName] The name of the chat file to save to
+ * @param {object} [options.withMetadata] Additional metadata to save with the chat
+ * @param {number} [options.mesId] The message ID to save the chat up to
+ * @param {boolean} [options.force] Force the saving despire the integrity check result
+ *
+ * @returns {Promise<void>}
+ */
+export async function saveChat({ chatName, withMetadata, mesId, force = false } = {}) {
+    if (arguments.length > 0 && typeof arguments[0] !== 'object') {
+        console.trace('saveChat called with positional arguments. Please use an object instead.');
+        [chatName, withMetadata, mesId, force] = arguments;
+    }
+
     const metadata = { ...chat_metadata, ...(withMetadata || {}) };
     const fileName = chatName ?? characters[this_chid]?.chat;
 
@@ -6765,53 +6806,59 @@ export async function saveChat(chatName, withMetadata, mesId) {
             toastr.error(t`Trying to save group chat with regular saveChat function. Aborting to prevent corruption.`);
             throw new Error('Group chat saved from saveChat');
         }
-        /*
-        if (item.is_user) {
-            //var str = item.mes.replace(`${name1}:`, `${name1}:`);
-            //chat[i].mes = str;
-            //chat[i].name = name1;
-        } else if (i !== chat.length - 1 && chat[i].swipe_id !== undefined) {
-            //  delete chat[i].swipes;
-            //  delete chat[i].swipe_id;
-        }
-        */
     });
 
-    const trimmed_chat = (mesId !== undefined && mesId >= 0 && mesId < chat.length)
-        ? chat.slice(0, parseInt(mesId) + 1)
-        : chat;
+    const trimmedChat = (mesId !== undefined && mesId >= 0 && mesId < chat.length)
+        ? chat.slice(0, Number(mesId) + 1)
+        : chat.slice();
 
-    var save_chat = [
+    const chatToSave = [
         {
             user_name: name1,
             character_name: name2,
             create_date: chat_create_date,
             chat_metadata: metadata,
         },
-        ...trimmed_chat,
+        ...trimmedChat,
     ];
-    return jQuery.ajax({
-        type: 'POST',
-        url: '/api/chats/save',
-        data: JSON.stringify({
-            ch_name: characters[this_chid].name,
-            file_name: fileName,
-            chat: save_chat,
-            avatar_url: characters[this_chid].avatar,
-        }),
-        beforeSend: function () {
 
-        },
-        cache: false,
-        dataType: 'json',
-        contentType: 'application/json',
-        success: function (data) { },
-        error: function (jqXHR, exception) {
-            toastr.error(t`Check the server connection and reload the page to prevent data loss.`, t`Chat could not be saved`);
-            console.log(exception);
-            console.log(jqXHR);
-        },
-    });
+    try {
+        const result = await fetch('/api/chats/save', {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({
+                ch_name: characters[this_chid].name,
+                file_name: fileName,
+                chat: chatToSave,
+                avatar_url: characters[this_chid].avatar,
+                force: force,
+            }),
+        });
+
+        if (result.ok) {
+            return;
+        }
+
+        const errorData = await result.json();
+        const isIntegrityError = errorData?.error === 'integrity' && !force;
+        if (!isIntegrityError) {
+            throw new Error(result.statusText);
+        }
+
+        const forceSaveConfirmed = await Popup.show.confirm(
+            t`ERROR: Chat integrity check failed.`,
+            t`Continuing the operation may result in data loss. Would you like to overwrite the chat file anyway? Pressing "NO" will cancel the save operation.`,
+            { okButton: t`Yes, overwrite`, cancelButton: t`No, cancel` },
+        ) === POPUP_RESULT.AFFIRMATIVE;
+
+        if (forceSaveConfirmed) {
+            await saveChat({ chatName, withMetadata, mesId, force: true });
+        }
+    } catch (error) {
+        console.error(error);
+        toastr.error(t`Check the server connection and reload the page to prevent data loss.`, t`Chat could not be saved`);
+    }
 }
 
 async function read_avatar_load(input) {
@@ -6987,6 +7034,9 @@ export async function getChat() {
             chat.shift();
         } else {
             chat_create_date = humanizedDateTime();
+        }
+        if (!chat_metadata['integrity']) {
+            chat_metadata['integrity'] = uuidv4();
         }
         await getChatResult();
         eventSource.emit('chatLoaded', { detail: { id: this_chid, character: characters[this_chid] } });
