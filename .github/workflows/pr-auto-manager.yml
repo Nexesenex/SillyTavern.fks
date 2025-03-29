@@ -29,6 +29,8 @@ jobs:
         # Checkout
         # https://github.com/marketplace/actions/checkout
         uses: actions/checkout@v4.2.2
+        with:
+            ref: ${{ github.head_ref }}
 
       - name: Setup Node.js
         # Setup Node.js environment
@@ -262,6 +264,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           for ISSUE in $(echo $final_issues | jq -r '.[]'); do
-            gh issue edit $ISSUE -R ${{ github.repository }} --add-label "✅ Done (staging)"
-            echo "Added label '✅ Done (staging)' to issue #$ISSUE"
+            gh issue edit $ISSUE -R ${{ github.repository }} --add-label "✅ Done (staging)" --remove-label "🧑‍💻 In Progress"
+            echo "Added label '✅ Done (staging)' (and removed '🧑‍💻 In Progress' if present) in issue #$ISSUE"
           done
