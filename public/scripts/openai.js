@@ -4193,6 +4193,9 @@ function getGroqMaxContext(model, isUnlocked) {
         'qwen-2.5-32b': max_128k,
         'deepseek-r1-distill-qwen-32b': max_128k,
         'deepseek-r1-distill-llama-70b-specdec': max_128k,
+        'mistral-saba-24b': max_32k,
+        'meta-llama/llama-4-scout-17b-16e-instruct': max_128k,
+        'meta-llama/llama-4-maverick-17b-128e-instruct': max_128k,
     };
 
     // Return context size if model found, otherwise default to 128k
@@ -4327,7 +4330,7 @@ async function onModelChange() {
             $('#openai_max_context').attr('max', max_32k);
         } else if (value.includes('gemini-1.5-pro') || value.includes('gemini-exp-1206') || value.includes('gemini-2.0-pro')) {
             $('#openai_max_context').attr('max', max_2mil);
-        } else if (value.includes('gemini-1.5-flash') || value.includes('gemini-2.0-flash') || value.includes('gemini-2.5-pro-exp-03-25')) {
+        } else if (value.includes('gemini-1.5-flash') || value.includes('gemini-2.0-flash') || value.includes('gemini-2.5-pro-exp-03-25') || value.includes('gemini-2.5-pro-preview-03-25')) {
             $('#openai_max_context').attr('max', max_1mil);
         } else if (value.includes('gemini-1.0-pro') || value === 'gemini-pro') {
             $('#openai_max_context').attr('max', max_32k);
@@ -4961,6 +4964,7 @@ export function isImageInliningSupported() {
     const visionSupportedModels = [
         'gpt-4-vision',
         'gemini-2.5-pro-exp-03-25',
+        'gemini-2.5-pro-preview-03-25',
         'gemini-2.0-pro-exp',
         'gemini-2.0-pro-exp-02-05',
         'gemini-2.0-flash-lite-preview',
