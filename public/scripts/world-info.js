@@ -1338,6 +1338,18 @@ function registerWorldInfoSlashCommands() {
         }
     }
 
+    async function getGlobalBooksCallback() {
+        if (!selected_world_info?.length) {
+            return JSON.stringify([]);
+        }
+
+        let entries = selected_world_info.slice();
+
+        console.debug(`[WI] Selected global world info has ${entries.length} entries`, selected_world_info);
+
+        return JSON.stringify(entries);
+    }
+
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'world',
         callback: onWorldInfoChange,
@@ -1378,6 +1390,13 @@ function registerWorldInfoSlashCommands() {
             }),
         ],
         aliases: ['getchatlore', 'getchatwi'],
+    }));
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'getglobalbooks',
+        callback: getGlobalBooksCallback,
+        returns: 'list of selected lorebook names',
+        helpString: 'Get a list of names of the selected global lorebooks and pass it down the pipe.',
+        aliases: ['getgloballore', 'getglobalwi'],
     }));
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'getpersonabook',

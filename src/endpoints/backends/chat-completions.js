@@ -250,7 +250,7 @@ async function sendClaudeRequest(request, response) {
             if (!generateResponse.ok) {
                 const generateResponseText = await generateResponse.text();
                 console.warn(color.red(`Claude API returned error: ${generateResponse.status} ${generateResponse.statusText}\n${generateResponseText}\n${divider}`));
-                return response.status(generateResponse.status).send({ error: true });
+                return response.status(500).send({ error: true });
             }
 
             /** @type {any} */
@@ -366,6 +366,7 @@ async function sendMakerSuiteRequest(request, response) {
 
         const useSystemPrompt = !useMultiModal && (
             model.includes('gemini-2.5-pro') ||
+            model.includes('gemini-2.5-flash') ||
             model.includes('gemini-2.0-pro') ||
             model.includes('gemini-2.0-flash') ||
             model.includes('gemini-2.0-flash-thinking-exp') ||
@@ -463,7 +464,7 @@ async function sendMakerSuiteRequest(request, response) {
         } else {
             if (!generateResponse.ok) {
                 console.warn(`Google AI Studio API returned error: ${generateResponse.status} ${generateResponse.statusText} ${await generateResponse.text()}`);
-                return response.status(generateResponse.status).send({ error: true });
+                return response.status(500).send({ error: true });
             }
 
             /** @type {any} */
