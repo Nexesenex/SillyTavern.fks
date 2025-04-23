@@ -1419,7 +1419,7 @@
                                         </div>
                                     </div>
 
-                                    <div data-tg-type="aphrodite, ooba, koboldcpp, tabby, llamacpp" id="dryBlock" class="wide100p">
+                                    <div data-tg-type="aphrodite, ooba, koboldcpp, tabby, llamacpp, dreamgen" id="dryBlock" class="wide100p">
                                         <h4 class="wide100p textAlignCenter" title="DRY penalizes tokens that would extend the end of the input into a sequence that has previously occurred in the input. Set multiplier to 0 to disable." data-i18n="[title]DRY_Repetition_Penalty_desc">
                                             <label data-i18n="DRY Repetition Penalty">DRY Repetition Penalty</label>
                                             <a href="https://github.com/oobabooga/text-generation-webui/pull/5677" target="_blank">
@@ -1574,7 +1574,7 @@
                                                     <div class="fa-solid fa-circle-info opacity50p " data-i18n="[title]Add the bos_token to the beginning of prompts. Disabling this can make the replies more creative" title="Add the bos_token to the beginning of prompts. Disabling this can make the replies more creative."></div>
                                                 </label>
                                             </label>
-                                            <label data-tg-type="ooba, llamacpp, tabby, koboldcpp" class="checkbox_label  flexGrow flexShrink" for="ban_eos_token_textgenerationwebui">
+                                            <label data-tg-type="ooba, llamacpp, tabby, koboldcpp, dreamgen" class="checkbox_label  flexGrow flexShrink" for="ban_eos_token_textgenerationwebui">
                                                 <input type="checkbox" id="ban_eos_token_textgenerationwebui" />
                                                 <label>
                                                     <small data-i18n="Ban EOS Token">Ban EOS Token</small>
@@ -2048,16 +2048,20 @@
                                             </span>
                                         </div>
                                     </div>
-                                    <div class="flex-container flexFlowColumn wide100p textAlignCenter marginTop10" data-source="openai,custom,claude,xai">
-                                        <div class="flex-container oneline-dropdown" title="Constrains effort on reasoning for reasoning models.&#10;Currently supported values are low, medium, and high.&#10;Reducing reasoning effort can result in faster responses and fewer tokens used on reasoning in a response." data-i18n="[title]Constrains effort on reasoning for reasoning models.">
+                                    <div class="flex-container flexFlowColumn wide100p textAlignCenter marginTop10" data-source="openai,custom,claude,xai,makersuite,openrouter">
+                                        <div class="flex-container oneline-dropdown" title="Constrains effort on reasoning for reasoning models.&#10;Reducing reasoning effort can result in faster responses and fewer tokens used on reasoning in a response." data-i18n="[title]Constrains effort on reasoning for reasoning models.">
                                             <label for="openai_reasoning_effort">
                                                 <span data-i18n="Reasoning Effort">Reasoning Effort</span>
-                                                <i data-source="claude" class="opacity50p fa-solid fa-circle-info" title="Allocates a portion of the response length for thinking (low: 10%, medium: 25%, high: 50%), but minimum 1024 tokens."></i>
+                                                <i data-source="openai,custom,xai,openrouter" class="opacity50p fa-solid fa-circle-info" title="OpenAI-style options: low, medium, high. Minimum and maximum are aliased to low and high. Auto does not send an effort level."></i>
+                                                <i data-source="claude,makersuite" class="opacity50p fa-solid fa-circle-info" title="Allocates a portion of the response length for thinking (low: 10%, medium: 25%, high: 50%). Other options are model-dependent."></i>
                                             </label>
                                             <select id="openai_reasoning_effort">
+                                                <option data-i18n="openai_reasoning_effort_auto" value="auto">Auto</option>
+                                                <option data-i18n="openai_reasoning_effort_minimum" value="min">Mininum</option>
                                                 <option data-i18n="openai_reasoning_effort_low" value="low">Low</option>
                                                 <option data-i18n="openai_reasoning_effort_medium" value="medium">Medium</option>
                                                 <option data-i18n="openai_reasoning_effort_high" value="high">High</option>
+                                                <option data-i18n="openai_reasoning_effort_maximum" value="max">Maximum</option>
                                             </select>
                                         </div>
                                     </div>
@@ -2884,10 +2888,7 @@
                                     </optgroup>
                                     <optgroup label="GPT-4o mini">
                                         <option value="gpt-4o-mini">gpt-4o-mini</option>
-                                        <option value="gpt-4o-2024-11-20">gpt-4o-2024-11-20</option>
-                                        <option value="gpt-4o-2024-08-06">gpt-4o-2024-08-06</option>
-                                        <option value="gpt-4o-2024-05-13">gpt-4o-2024-05-13</option>
-                                        <option value="chatgpt-4o-latest">chatgpt-4o-latest</option>
+                                        <option value="gpt-4o-mini-2024-07-18">gpt-4o-mini-2024-07-18</option>
                                     </optgroup>
                                     <optgroup label="GPT-4.1">
                                         <option value="gpt-4.1">gpt-4.1</option>

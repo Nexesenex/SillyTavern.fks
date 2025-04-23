@@ -216,6 +216,15 @@ const openrouter_middleout_types = {
     OFF: 'off',
 };
 
+export const reasoning_effort_types = {
+    auto: 'auto',
+    low: 'low',
+    medium: 'medium',
+    high: 'high',
+    min: 'min',
+    max: 'max',
+};
+
 const sensitiveFields = [
     'reverse_proxy',
     'proxy_password',
@@ -382,7 +391,7 @@ const default_settings = {
     continue_postfix: continue_postfix_types.SPACE,
     custom_prompt_post_processing: custom_prompt_post_processing_types.NONE,
     show_thoughts: true,
-    reasoning_effort: 'medium',
+    reasoning_effort: reasoning_effort_types.auto,
     enable_web_search: false,
     request_images: false,
     seed: -1,
@@ -463,7 +472,7 @@ const oai_settings = {
     continue_postfix: continue_postfix_types.SPACE,
     custom_prompt_post_processing: custom_prompt_post_processing_types.NONE,
     show_thoughts: true,
-    reasoning_effort: 'medium',
+    reasoning_effort: reasoning_effort_types.auto,
     enable_web_search: false,
     request_images: false,
     seed: -1,
@@ -1412,9 +1421,9 @@ export async function prepareOpenAIMessages({
         await populateChatCompletion(prompts, chatCompletion, { bias, quietPrompt, quietImage, type, cyclePrompt, messages, messageExamples });
     } catch (error) {
         if (error instanceof TokenBudgetExceededError) {
-            toastr.error(t`An error occurred while counting tokens: Token budget exceeded.`);
-            chatCompletion.log('Token budget exceeded.');
-            promptManager.error = t`Not enough free tokens for mandatory prompts. Raise your token Limit or disable custom prompts.`;
+            toastr.error(t`Mandatory prompts exceed the context size.`);
+            chatCompletion.log('Mandatory prompts exceed the context size.');
+            promptManager.error = t`Not enough free tokens for mandatory prompts. Raise your token limit or disable custom prompts.`;
         } else if (error instanceof InvalidCharacterNameError) {
             toastr.warning(t`An error occurred while counting tokens: Invalid character name`);
             chatCompletion.log('Invalid character name');
@@ -1937,6 +1946,31 @@ async function sendAltScaleRequest(messages, logit_bias, signal, type) {
     return data.output;
 }
 
+function getReasoningEffort() {
+    // These sources expect the effort as string.
+    const reasoningEffortSources = [
+        chat_completion_sources.OPENAI,
+        chat_completion_sources.CUSTOM,
+        chat_completion_sources.XAI,
+        chat_completion_sources.OPENROUTER,
+    ];
+
+    if (!reasoningEffortSources.includes(oai_settings.chat_completion_source)) {
+        return oai_settings.reasoning_effort;
+    }
+
+    switch (oai_settings.reasoning_effort) {
+        case reasoning_effort_types.auto:
+            return undefined;
+        case reasoning_effort_types.min:
+            return reasoning_effort_types.low;
+        case reasoning_effort_types.max:
+            return reasoning_effort_types.high;
+        default:
+            return oai_settings.reasoning_effort;
+    }
+}
+
 /**
  * Send a chat completion request to backend
  * @param {string} type (impersonate, quiet, continue, etc)
@@ -2023,7 +2057,7 @@ async function sendOpenAIRequest(type, messages, signal) {
         'char_name': name2,
         'group_names': getGroupNames(),
         'include_reasoning': Boolean(oai_settings.show_thoughts),
-        'reasoning_effort': String(oai_settings.reasoning_effort),
+        'reasoning_effort': getReasoningEffort(),
         'enable_web_search': Boolean(oai_settings.enable_web_search),
         'request_images': Boolean(oai_settings.request_images),
         'custom_prompt_post_processing': oai_settings.custom_prompt_post_processing,
