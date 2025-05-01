@@ -4000,7 +4000,9 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
 
     if (main_api !== 'openai') {
         if (power_user.sysprompt.enabled) {
-            system = power_user.prefer_character_prompt && system ? system : baseChatReplace(power_user.sysprompt.content, name1, name2);
+            system = power_user.prefer_character_prompt && system
+                ? substituteParams(system, name1, name2, (power_user.sysprompt.content ?? ''))
+                : baseChatReplace(power_user.sysprompt.content, name1, name2);
             system = isInstruct ? formatInstructModeSystemPrompt(substituteParams(system, name1, name2, power_user.sysprompt.content)) : system;
         } else {
             // Nullify if it's not enabled
@@ -4207,10 +4209,10 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         injectedIndices = await doChatInject(coreChat, isContinue);
     }
 
-    // Insert character jailbreak as the last user message (if exists, allowed, preferred, and not using Chat Completion)
-    if (power_user.context.allow_jailbreak && power_user.prefer_character_jailbreak && main_api !== 'openai' && jailbreak) {
-        // Set "original" explicity to empty string since there's no original
-        jailbreak = substituteParams(jailbreak, name1, name2, '');
+    if (main_api !== 'openai' && power_user.sysprompt.enabled) {
+        jailbreak = power_user.prefer_character_jailbreak && jailbreak
+            ? substituteParams(jailbreak, name1, name2, (power_user.sysprompt.post_history ?? ''))
+            : baseChatReplace(power_user.sysprompt.post_history, name1, name2);
 
         // When continuing generation of previous output, last user message precedes the message to continue
         if (isContinue) {

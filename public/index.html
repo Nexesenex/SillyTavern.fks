@@ -2622,8 +2622,8 @@
                             </div>
                             <div data-tg-type="ollama">
                                 <div class="flex-container flexFlowColumn">
-                                    <a href="https://github.com/jmorganca/ollama" target="_blank">
-                                        jmorganca/ollama
+                                    <a href="https://github.com/ollama/ollama" target="_blank">
+                                        ollama/ollama
                                     </a>
                                 </div>
                                 <div class="flex1">
@@ -3622,11 +3622,6 @@
                                         <small data-i18n="Names as Stop Strings">Names as Stop Strings</small>
                                     </label>
                                 </div>
-
-                                <label class="checkbox_label" title="Includes Post-History Instructions at the end of the prompt, if defined in the character card AND ''Prefer Char. Instructions'' is enabled.&#10;THIS IS NOT RECOMMENDED FOR TEXT COMPLETION MODELS, CAN LEAD TO BAD OUTPUT." data-i18n="[title]context_allow_post_history_instructions">
-                                    <input id="context_allow_jailbreak" type="checkbox" />
-                                    <small data-i18n="Allow Post-History Instructions">Allow Post-History Instructions</small>
-                                </label>
                             </div>
                         </div>
                     </div>
@@ -3828,9 +3823,7 @@
                                 </label>
                             </div>
                         </h4>
-                        <div id="SystemPromptBlock">
-
-
+                        <div id="SystemPromptBlock" class="marginBot10">
                             <div class="flex-container" title="Select your current System Prompt" data-i18n="[title]Select your current System Prompt">
                                 <select id="sysprompt_select" data-preset-manager-for="sysprompt" class="flex1 text_pole"></select>
                                 <div class="flex-container margin0 justifyCenter gap3px">
@@ -3852,10 +3845,14 @@
                                 </label>
                                 <textarea id="sysprompt_content" class="text_pole textarea_compact autoSetHeight"></textarea>
                             </div>
-                        </div>
 
-                        <div>
-                            &nbsp;
+                            <div>
+                                <label for="sysprompt_post_history" class="flex-container">
+                                    <small data-i18n="Post-History Instructions">Post-History Instructions</small>
+                                    <i class="editor_maximize fa-solid fa-maximize right_menu_button" data-for="sysprompt_post_history" title="Expand the editor" data-i18n="[title]Expand the editor"></i>
+                                </label>
+                                <textarea id="sysprompt_post_history" class="text_pole textarea_compact autoSetHeight"></textarea>
+                            </div>
                         </div>
 
                         <div>

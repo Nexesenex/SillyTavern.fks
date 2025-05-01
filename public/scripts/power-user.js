@@ -252,7 +252,6 @@ let power_user = {
         chat_start: defaultChatStart,
         example_separator: defaultExampleSeparator,
         use_stop_strings: true,
-        allow_jailbreak: false,
         names_as_stop_strings: true,
     },
 
@@ -263,6 +262,7 @@ let power_user = {
         enabled: true,
         name: 'Neutral - Chat',
         content: 'Write {{char}}\'s next reply in a fictional chat between {{char}} and {{user}}.',
+        post_history: '',
     },
 
     reasoning: {
@@ -342,7 +342,6 @@ const contextControls = [
     { id: 'context_example_separator', property: 'example_separator', isCheckbox: false, isGlobalSetting: false },
     { id: 'context_chat_start', property: 'chat_start', isCheckbox: false, isGlobalSetting: false },
     { id: 'context_use_stop_strings', property: 'use_stop_strings', isCheckbox: true, isGlobalSetting: false, defaultValue: false },
-    { id: 'context_allow_jailbreak', property: 'allow_jailbreak', isCheckbox: true, isGlobalSetting: false, defaultValue: false },
     { id: 'context_names_as_stop_strings', property: 'names_as_stop_strings', isCheckbox: true, isGlobalSetting: false, defaultValue: true },
 
     // Existing power user settings
