@@ -5715,6 +5715,7 @@ body:not(.movingUI) .drawer-content.maximized {
     width: unset;
     margin: 0;
     font-size: calc(var(--mainFontSize) * 0.85);
+    padding-right: 20px;
 }
 
 .paginationjs-pages ul li a {
