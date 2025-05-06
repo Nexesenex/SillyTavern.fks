@@ -1,5 +1,5 @@
 import { Fuse, DOMPurify } from '../lib.js';
-import { flashHighlight } from './utils.js';
+import { copyText, flashHighlight } from './utils.js';
 
 import {
     Generate,
@@ -2282,6 +2282,45 @@ export function initDefaultSlashCommands() {
             <strong>Example:</strong> <pre><code>/chat-jump 10</code></pre> Scrolls to the 11th message (id=10).
         </div>
     `,
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'clipboard-get',
+        returns: 'clipboard text',
+        callback: async () => {
+            if (!navigator.clipboard) {
+                toastr.warning('Clipboard API not available in this context.');
+                return '';
+            }
+
+            try {
+                const text = await navigator.clipboard.readText();
+                return text;
+            }
+            catch (error) {
+                console.error('Error reading clipboard:', error);
+                toastr.warning('Failed to read clipboard text. Have you granted the permission?');
+                return '';
+            }
+        },
+        helpString: 'Retrieves the text from the OS clipboard. Only works in secure contexts (HTTPS or localhost). Browser may ask for permission.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'clipboard-set',
+        callback: async (_, text) => {
+            await copyText(text.toString());
+            return '';
+        },
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'text to copy to the clipboard',
+                typeList: [ARGUMENT_TYPE.STRING],
+                isRequired: true,
+                acceptsMultiple: false,
+            }),
+        ],
+        helpString: 'Copies the provided text to the OS clipboard. Returns an empty string.',
     }));
 
     registerVariableCommands();

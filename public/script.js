@@ -97,6 +97,7 @@ import {
     forceCharacterEditorTokenize,
     applyPowerUserSettings,
     generatedTextFiltered,
+    applyStylePins,
 } from './scripts/power-user.js';
 
 import {
@@ -1920,6 +1921,7 @@ export async function showMoreMessages(messagesToLoad = null) {
         $('#chat').scrollTop(newHeight - prevHeight);
     }
 
+    applyStylePins();
     await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
 }
 
@@ -1957,6 +1959,7 @@ export async function printMessages() {
     hideSwipeButtons();
     showSwipeButtons();
     scrollChatToBottom();
+    applyStylePins();
 
     function incrementAndCheck() {
         imagesLoaded++;

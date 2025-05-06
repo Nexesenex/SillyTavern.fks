@@ -25,6 +25,7 @@ import {
     setActiveCharacter,
     entitiesFilter,
     doNewChat,
+    messageFormatting,
 } from '../script.js';
 import { isMobile, initMovingUI, favsToHotswap } from './RossAscends-mods.js';
 import {
@@ -326,6 +327,7 @@ let power_user = {
     forbid_external_media: true,
     external_media_allowed_overrides: [],
     external_media_forbidden_overrides: [],
+    pin_styles: true,
 };
 
 let themes = [];
@@ -1398,6 +1400,50 @@ function applyPowerUserSettings() {
     switchSwipeNumAllMessages();
 }
 
+export function applyStylePins() {
+    try {
+        const existingPins = document.querySelector('#chat > .style-pins');
+        if (existingPins) {
+            existingPins.remove();
+        }
+
+        if (!power_user.pin_styles) {
+            return;
+        }
+
+        const firstDisplayed = getFirstDisplayedMessageId();
+        if (firstDisplayed === 0 || !isFinite(firstDisplayed)) {
+            return;
+        }
+
+        const chatElement = document.getElementById('chat');
+        if (!chatElement) {
+            return;
+        }
+
+        const firstMessage = chat[0];
+        if (!firstMessage) {
+            return;
+        }
+
+        const formattedMessage = messageFormatting(firstMessage.mes, firstMessage.name, firstMessage.is_system, firstMessage.is_user, 0, {}, false);
+        const htmlElement = document.createElement('div');
+        htmlElement.innerHTML = formattedMessage;
+
+        const styleTags = htmlElement.querySelectorAll('style');
+        if (styleTags.length === 0) {
+            return;
+        }
+
+        const pinsElement = document.createElement('div');
+        pinsElement.classList.add('style-pins');
+        pinsElement.append(...Array.from(styleTags));
+        chatElement.prepend(pinsElement);
+    } catch (error) {
+        console.error('Error applying style pins:', error);
+    }
+}
+
 function getExampleMessagesBehavior() {
     if (power_user.strip_examples) {
         return 'strip';
@@ -1608,6 +1654,7 @@ async function loadPowerUserSettings(settings, data) {
     $('#auto-connect-checkbox').prop('checked', power_user.auto_connect);
     $('#auto-load-chat-checkbox').prop('checked', power_user.auto_load_chat);
     $('#forbid_external_media').prop('checked', power_user.forbid_external_media);
+    $('#pin_styles').prop('checked', power_user.pin_styles);
 
     for (const theme of themes) {
         const option = document.createElement('option');
@@ -3884,6 +3931,12 @@ $(document).ready(() => {
         reloadCurrentChat();
     });
 
+    $('#pin_styles').on('input', function () {
+        power_user.pin_styles = !!$(this).prop('checked');
+        saveSettingsDebounced();
+        applyStylePins();
+    });
+
     $('#ui_preset_import_button').on('click', function () {
         $('#ui_preset_import_file').trigger('click');
     });
@@ -4235,7 +4288,7 @@ $(document).ready(() => {
                 enumList: commonEnumProviders.boolean('trueFalse')(),
             }),
         ],
-        unnamedArgumentList:[
+        unnamedArgumentList: [
             SlashCommandArgument.fromProps({
                 description: 'value',
                 typeList: [ARGUMENT_TYPE.STRING],
