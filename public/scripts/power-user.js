@@ -328,6 +328,7 @@ let power_user = {
     external_media_allowed_overrides: [],
     external_media_forbidden_overrides: [],
     pin_styles: true,
+    click_to_edit: false,
 };
 
 let themes = [];
@@ -1330,6 +1331,12 @@ function applyTheme(name) {
                 switchSwipeNumAllMessages();
             },
         },
+        {
+            key: 'click_to_edit',
+            action: () => {
+                $('#click_to_edit').prop('checked', power_user.click_to_edit);
+            },
+        },
     ];
 
     for (const { key, selector, type, action } of themeProperties) {
@@ -1460,6 +1467,10 @@ async function loadPowerUserSettings(settings, data) {
     const defaultStscript = JSON.parse(JSON.stringify(power_user.stscript));
     // Load from settings.json
     if (settings.power_user !== undefined) {
+        // Migrate old preference to a new setting
+        if (settings.power_user.click_to_edit === undefined && settings.power_user.chat_display === chat_styles.DOCUMENT) {
+            settings.power_user.click_to_edit = true;
+        }
         Object.assign(power_user, settings.power_user);
     }
 
@@ -1655,6 +1666,7 @@ async function loadPowerUserSettings(settings, data) {
     $('#auto-load-chat-checkbox').prop('checked', power_user.auto_load_chat);
     $('#forbid_external_media').prop('checked', power_user.forbid_external_media);
     $('#pin_styles').prop('checked', power_user.pin_styles);
+    $('#click_to_edit').prop('checked', power_user.click_to_edit);
 
     for (const theme of themes) {
         const option = document.createElement('option');
@@ -2387,6 +2399,7 @@ function getThemeObject(name) {
         reduced_motion: power_user.reduced_motion,
         compact_input_area: power_user.compact_input_area,
         show_swipe_num_all_messages: power_user.show_swipe_num_all_messages,
+        click_to_edit: power_user.click_to_edit,
     };
 }
 
@@ -3935,6 +3948,11 @@ $(document).ready(() => {
         power_user.pin_styles = !!$(this).prop('checked');
         saveSettingsDebounced();
         applyStylePins();
+    });
+
+    $('#click_to_edit').on('input', function () {
+        power_user.click_to_edit = !!$(this).prop('checked');
+        saveSettingsDebounced();
     });
 
     $('#ui_preset_import_button').on('click', function () {
