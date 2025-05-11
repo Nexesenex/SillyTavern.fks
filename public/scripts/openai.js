@@ -1661,7 +1661,8 @@ export function getChatCompletionModel(source = null) {
         case chat_completion_sources.XAI:
             return oai_settings.xai_model;
         default:
-            throw new Error(`Unknown chat completion source: ${activeSource}`);
+            console.error(`Unknown chat completion source: ${activeSource}`);
+            return '';
     }
 }
 
