@@ -945,7 +945,7 @@ $.ajaxPrefilter((options, originalOptions, xhr) => {
 export async function pingServer() {
     try {
         const result = await fetch('api/ping', {
-            method: 'GET',
+            method: 'POST',
             headers: getRequestHeaders(),
         });
 
