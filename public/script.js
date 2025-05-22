@@ -313,8 +313,6 @@ await new Promise((resolve) => {
     }
 });
 
-//showLoader(); <-- must wait for poweruser (called from firstinit()), so moved it in there
-
 // Configure toast library:
 toastr.options.escapeHtml = true; // Prevent raw HTML inserts
 toastr.options.timeOut = 4000; // How long the toast will display without user interaction
@@ -968,11 +966,11 @@ async function firstLoadInit() {
         const tokenData = await tokenResponse.json();
         token = tokenData.token;
     } catch {
-        hideLoader();
         toastr.error(t`Couldn't get CSRF token. Please refresh the page.`, t`Error`, { timeOut: 0, extendedTimeOut: 0, preventDuplicates: true });
         throw new Error('Initialization failed');
     }
 
+    showLoader();
     initLibraryShims();
     addShowdownPatch(showdown);
     reloadMarkdownProcessor();
@@ -990,7 +988,6 @@ async function firstLoadInit() {
     await initPresetManager();
     await getSystemMessages();
     await getSettings();
-    showLoader();
     initKeyboard();
     initDynamicStyles();
     initTags();
@@ -5944,6 +5941,7 @@ function extractImageFromData(data, { mainApi = null, chatCompletionSource = nul
     switch (mainApi ?? main_api) {
         case 'openai': {
             switch (chatCompletionSource ?? oai_settings.chat_completion_source) {
+                case chat_completion_sources.VERTEXAI:
                 case chat_completion_sources.MAKERSUITE: {
                     const inlineData = data?.responseContent?.parts?.find(x => x.inlineData)?.inlineData;
                     if (inlineData) {
@@ -11302,6 +11300,7 @@ jQuery(async function () {
             $(`.mes[mesid="${this_del_mes}"]`).nextAll('div').remove();
             $(`.mes[mesid="${this_del_mes}"]`).remove();
             chat.length = this_del_mes;
+            chat_metadata['tainted'] = true;
             await saveChatConditional();
             chatElement.scrollTop(chatElement[0].scrollHeight);
             await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
@@ -11741,6 +11740,7 @@ jQuery(async function () {
         let startFromZero = Number(this_edit_mes_id) === 0;
 
         this_edit_mes_id = undefined;
+        chat_metadata['tainted'] = true;
 
         updateViewMessageIds(startFromZero);
         saveChatDebounced();
