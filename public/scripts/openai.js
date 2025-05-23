@@ -203,13 +203,14 @@ const continue_postfix_types = {
     DOUBLE_NEWLINE: '\n\n',
 };
 
-const custom_prompt_post_processing_types = {
+export const custom_prompt_post_processing_types = {
     NONE: '',
     /** @deprecated Use MERGE instead. */
     CLAUDE: 'claude',
     MERGE: 'merge',
     SEMI: 'semi',
     STRICT: 'strict',
+    SINGLE: 'single',
 };
 
 const openrouter_middleout_types = {
@@ -4658,7 +4659,7 @@ async function onModelChange() {
         if (oai_settings.max_context_unlocked) {
             $('#openai_max_context').attr('max', max_200k);
         }
-        else if (value == 'claude-2.1' || value.startsWith('claude-3')) {
+        else if (value == 'claude-2.1' || value.startsWith('claude-3') || value.startsWith('claude-opus') || value.startsWith('claude-sonnet')) {
             $('#openai_max_context').attr('max', max_200k);
         }
         else if (value.endsWith('100k') || value.startsWith('claude-2') || value === 'claude-instant-1.2') {
@@ -5302,6 +5303,8 @@ export function isImageInliningSupported() {
         'yi-vision',
         // Claude
         'claude-3',
+        'claude-opus-4',
+        'claude-sonnet-4',
         // Cohere
         'c4ai-aya-vision',
         // Google AI Studio

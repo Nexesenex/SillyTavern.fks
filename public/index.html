@@ -1991,6 +1991,7 @@
                                         <div class="flexBasis100p toggle-description justifyLeft">
                                             <span data-i18n="enable_functions_desc_1">Allows using </span><a href="https://platform.openai.com/docs/guides/function-calling" target="_blank" data-i18n="enable_functions_desc_2">function tools</a>.
                                             <span data-i18n="enable_functions_desc_3">Can be utilized by various extensions to provide additional functionality.</span>
+                                            <strong data-i18n="enable_functions_desc_4">Not supported when Prompt Post-Processing is used!</strong>
                                         </div>
                                     </div>
                                     <div class="range-block" data-source="openai,openrouter,mistralai,makersuite,vertexai,claude,custom,01ai,xai,pollinations">
@@ -2096,9 +2097,7 @@
                                         </div>
                                         <label for="claude_use_sysprompt" class="checkbox_label widthFreeExpand">
                                             <input id="claude_use_sysprompt" type="checkbox" />
-                                            <span data-i18n="Use system prompt (Claude 2.1+ only)">
-                                                Use system prompt (Claude 2.1+ only)
-                                            </span>
+                                            <span data-i18n="Use system prompt">Use system prompt</span>
                                         </label>
                                         <div class="toggle-description justifyLeft marginBot5">
                                             <span data-i18n="Send the system prompt for supported models. If disabled, the user message is added to the beginning of the prompt.">
@@ -2984,6 +2983,10 @@
                                 <h4 data-i18n="Claude Model">Claude Model</h4>
                                 <select id="model_claude_select">
                                     <optgroup label="Versions">
+                                        <option value="claude-opus-4-0">claude-opus-4-0</option>
+                                        <option value="claude-opus-4-20250514">claude-opus-4-20250514</option>
+                                        <option value="claude-sonnet-4-0">claude-sonnet-4-0</option>
+                                        <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
                                         <option value="claude-3-7-sonnet-latest">claude-3-7-sonnet-latest</option>
                                         <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet-20250219</option>
                                         <option value="claude-3-5-sonnet-latest">claude-3-5-sonnet-latest</option>
@@ -3535,13 +3538,21 @@
                                 </span>
                             </div>
                         </div>
-                        <div id="prompt_post_porcessing_form" data-source="custom,openrouter">
-                            <h4 data-i18n="Prompt Post-Processing">Prompt Post-Processing</h4>
+                        <div id="prompt_post_processing_form">
+                            <h4>
+                                <span data-i18n="Prompt Post-Processing">
+                                    Prompt Post-Processing
+                                </span>
+                                <a href="https://docs.sillytavern.app/usage/api-connections/openai/#prompt-post-processing" class="notes-link" target="_blank">
+                                    <span class="fa-solid fa-circle-question note-link-span"></span>
+                                </a>
+                            </h4>
                             <select id="custom_prompt_post_processing" class="text_pole" title="Applies additional processing to the prompt before sending it to the API." data-i18n="[title]Applies additional processing to the prompt before sending it to the API.">
                                 <option data-i18n="prompt_post_processing_none" value="">None</option>
                                 <option data-i18n="prompt_post_processing_merge" value="merge">Merge consecutive roles</option>
                                 <option data-i18n="prompt_post_processing_semi" value="semi">Semi-strict (alternating roles)</option>
                                 <option data-i18n="prompt_post_processing_strict" value="strict">Strict (user first, alternating roles)</option>
+                                <option data-i18n="prompt_post_processing_single" value="single">Single user message</option>
                             </select>
                         </div>
                         <div class="flex-container flex">
@@ -5440,9 +5451,10 @@
                         </div>
                         <hr>
                         <div id="spoiler_free_desc" class="flex-container flexFlowColumn flex1 flexNoGap">
-                            <div id="creators_notes_div" class="title_restorable">
-                                <span data-i18n="Creator's Notes">Creator's Notes</span>
+                            <div id="creators_notes_div" class="title_restorable flexGap5">
+                                <span class="flex1" data-i18n="Creator's Notes">Creator's Notes</span>
                                 <small id="creators_note_desc_hidden" data-i18n="Character details are hidden.">Character details are hidden.</small>
+                                <div id="creators_note_styles_button" class="margin0 menu_button fa-solid fa-palette fa-fw" title="Allow / Forbid the use of global styles for this character." data-i18n="[title]Allow / Forbid the use of global styles for this character."></div>
                                 <div id="spoiler_free_desc_button" class="margin0 menu_button fa-solid fa-eye fa-fw" title="Show / Hide Description and First Message" data-i18n="[title]Show / Hide Description and First Message"></div>
                             </div>
                             <div id="creator_notes_spoiler" class="flex1"></div>
