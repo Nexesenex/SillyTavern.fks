@@ -935,7 +935,7 @@ async function importFromPng(uploadPath, { request }, preservedFileName) {
 
 export const router = express.Router();
 
-router.post('/create', async function (request, response) {
+router.post('/create', getFileNameValidationFunction('file_name'), async function (request, response) {
     try {
         if (!request.body) return response.sendStatus(400);
 
@@ -1048,7 +1048,7 @@ router.post('/edit', validateAvatarUrlMiddleware, async function (request, respo
         return response.sendStatus(200);
     }
     catch {
-        console.error('An error occured, character edit invalidated.');
+        console.error('An error occurred, character edit invalidated.');
     }
 });
 
@@ -1094,7 +1094,7 @@ router.post('/edit-attribute', validateAvatarUrlMiddleware, async function (requ
         await writeCharacterData(avatarPath, newCharJSON, targetFile, request);
         return response.sendStatus(200);
     } catch (err) {
-        console.error('An error occured, character edit invalidated.', err);
+        console.error('An error occurred, character edit invalidated.', err);
     }
 });
 
