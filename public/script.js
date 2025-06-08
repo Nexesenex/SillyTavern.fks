@@ -10,7 +10,6 @@ import {
     SVGInject,
     Popper,
     initLibraryShims,
-    slideToggle,
     default as libs,
 } from './lib.js';
 
@@ -771,21 +770,6 @@ async function getSystemMessages() {
     };
 }
 
-// Register configuration migrations
-registerPromptManagerMigration();
-
-$(document).ajaxError(function myErrorHandler(_, xhr) {
-    // Cohee: CSRF doesn't error out in multiple tabs anymore, so this is unnecessary
-    /*
-    if (xhr.status == 403) {
-        toastr.warning(
-            'doubleCsrf errors in console are NORMAL in this case. If you want to run ST in multiple tabs, start the server with --disableCsrf option.',
-            'Looks like you\'ve opened SillyTavern in another browser tab',
-            { timeOut: 0, extendedTimeOut: 0, preventDuplicates: true },
-        );
-    } */
-});
-
 async function getClientVersion() {
     try {
         const response = await fetch('/version');
@@ -866,7 +850,8 @@ export let create_save = {
     creator: '',
     personality: '',
     first_message: '',
-    avatar: '',
+    /** @type {FileList|null} */
+    avatar: null,
     scenario: '',
     mes_example: '',
     world: '',
@@ -983,6 +968,8 @@ async function firstLoadInit() {
     }
 
     showLoader();
+    registerPromptManagerMigration();
+    initStandaloneMode();
     initLibraryShims();
     addShowdownPatch(showdown);
     reloadMarkdownProcessor();
@@ -1039,6 +1026,13 @@ async function fixViewport() {
     document.body.style.position = 'absolute';
     await delay(1);
     document.body.style.position = '';
+}
+
+function initStandaloneMode() {
+    const isPwaMode = window.matchMedia('(display-mode: standalone)').matches;
+    if (isPwaMode) {
+        $('body').addClass('PWA');
+    }
 }
 
 function cancelStatusCheck(reason = 'Manually cancelled status check') {
@@ -1396,7 +1390,6 @@ export function resultCheckStatus() {
     displayOnlineStatus();
     stopStatusLoading();
 }
-
 
 /**
  * Switches the currently selected character to the one with the given ID. (character index, not the character key!)
@@ -3761,6 +3754,7 @@ export async function generateRaw(prompt, api, instructOverride, quietToLoud, sy
         if (responseLengthCustomized) {
             TempResponseLength.save(api, responseLength);
         }
+        /** @type {object|any[]} */
         let generateData = {};
 
         switch (api) {
@@ -7139,6 +7133,11 @@ export async function saveChat({ chatName, withMetadata, mesId, force = false } 
     }
 }
 
+/**
+ * Processes the avatar image from the input element, allowing the user to crop it if necessary.
+ * @param {HTMLInputElement} input - The input element containing the avatar file.
+ * @returns {Promise<void>}
+ */
 async function read_avatar_load(input) {
     if (input.files && input.files[0]) {
         if (selected_button == 'create') {
@@ -7170,7 +7169,7 @@ async function read_avatar_load(input) {
         await createOrEditCharacter();
         await delay(DEFAULT_SAVE_EDIT_TIMEOUT);
 
-        const formData = new FormData($('#form_create').get(0));
+        const formData = new FormData(/** @type {HTMLFormElement} */($('#form_create').get(0)));
         await fetch(getThumbnailUrl('avatar', formData.get('avatar_url')), {
             method: 'GET',
             cache: 'no-cache',
@@ -7180,22 +7179,21 @@ async function read_avatar_load(input) {
             },
         });
 
-        $('.mes').each(async function () {
-            const nameMatch = $(this).attr('ch_name') == formData.get('ch_name');
-            if ($(this).attr('is_system') == 'true' && !nameMatch) {
-                return;
-            }
-            if ($(this).attr('is_user') == 'true') {
-                return;
-            }
+        const messages = $('.mes').toArray();
+        for (const el of messages) {
+            const $el = $(el);
+            const nameMatch = $el.attr('ch_name') == formData.get('ch_name');
+            if ($el.attr('is_system') == 'true' && !nameMatch) continue;
+            if ($el.attr('is_user') == 'true') continue;
+
             if (nameMatch) {
                 const previewSrc = $('#avatar_load_preview').attr('src');
-                const avatar = $(this).find('.avatar img');
+                const avatar = $el.find('.avatar img');
                 avatar.attr('src', default_avatar);
                 await delay(1);
                 avatar.attr('src', previewSrc);
             }
-        });
+        }
 
         console.log('Avatar refreshed');
     }
@@ -8045,7 +8043,7 @@ export async function getChatsFromFiles(data, isGroupChat) {
  * response is an object with an `error` property set to `true`.
  */
 export async function getPastCharacterChats(characterId = null) {
-    characterId = characterId ?? this_chid;
+    characterId = characterId ?? parseInt(this_chid);
     if (!characters[characterId]) return [];
 
     const response = await fetch('/api/characters/chats', {
@@ -8112,9 +8110,7 @@ export async function displayPastChats() {
     // UX convenience: Focus the search field when the Manage Chat Files view opens.
     setTimeout(function () {
         const textSearchElement = $('#select_chat_search');
-        textSearchElement.click();
-        textSearchElement.focus();
-        textSearchElement.select();  // select content (if any) for easy erasing
+        textSearchElement.trigger('click').trigger('focus').trigger('select');
     }, 200);
 }
 
@@ -8381,11 +8377,10 @@ function select_rm_create({ switchMenu = true } = {}) {
     switchMenu && setMenuType('create');
 
     //console.log('select_rm_Create() -- selected button: '+selected_button);
-    if (selected_button == 'create') {
-        if (create_save.avatar != '') {
-            $('#add_avatar_button').get(0).files = create_save.avatar;
-            read_avatar_load($('#add_avatar_button').get(0));
-        }
+    if (selected_button == 'create' && create_save.avatar) {
+        const addAvatarInput = /** @type {HTMLInputElement} */ ($('#add_avatar_button').get(0));
+        addAvatarInput.files = create_save.avatar;
+        read_avatar_load(addAvatarInput);
     }
 
     switchMenu && selectRightMenuWithAnimation('rm_ch_create_block');
@@ -8511,11 +8506,18 @@ export function updateChatMetadata(newValues, reset) {
     chat_metadata = reset ? { ...newValues } : { ...chat_metadata, ...newValues };
 }
 
+
+/**
+ * Updates the state of the favorite button based on the provided state.
+ * @param {boolean} state Whether the favorite button should be on or off.
+ */
 function updateFavButtonState(state) {
+    // Update global state of the flag
+    // TODO: This is bad and needs to be refactored.
     fav_ch_checked = state;
-    $('#fav_checkbox').val(fav_ch_checked);
-    $('#favorite_button').toggleClass('fav_on', fav_ch_checked);
-    $('#favorite_button').toggleClass('fav_off', !fav_ch_checked);
+    $('#fav_checkbox').prop('checked', state);
+    $('#favorite_button').toggleClass('fav_on', state);
+    $('#favorite_button').toggleClass('fav_off', !state);
 }
 
 export async function setScenarioOverride() {
@@ -8831,7 +8833,7 @@ function updateEditArrowClasses() {
 export function closeMessageEditor(what = 'all') {
     if (what === 'message' || what === 'all') {
         if (this_edit_mes_id) {
-            $(`#chat .mes[mesid="${this_edit_mes_id}"] .mes_edit_cancel`).click();
+            $(`#chat .mes[mesid="${this_edit_mes_id}"] .mes_edit_cancel`).trigger('click');
         }
     }
     if (what === 'reasoning' || what === 'all') {
@@ -8920,7 +8922,8 @@ function openCharacterWorldPopup() {
     }
 
     function onExtraWorldInfoChanged() {
-        const selectedWorlds = $('.character_extra_world_info_selector').val();
+        const selectorFieldValue = $('.character_extra_world_info_selector').val();
+        const selectedWorlds = Array.isArray(selectorFieldValue) ? selectorFieldValue : [];
         let charLore = world_info.charLore ?? [];
 
         // TODO: Maybe make this utility function not use the window context?
@@ -8965,7 +8968,7 @@ function openCharacterWorldPopup() {
     // Apped to base dropdown
     world_names.forEach((item, i) => {
         const option = document.createElement('option');
-        option.value = i;
+        option.value = String(i);
         option.innerText = item;
         option.selected = item === worldId;
         select.append(option);
@@ -8977,7 +8980,7 @@ function openCharacterWorldPopup() {
     }
     world_names.forEach((item, i) => {
         const option = document.createElement('option');
-        option.value = i;
+        option.value = String(i);
         option.innerText = item;
 
         const existingCharLore = world_info.charLore?.find((e) => e.name === getCharaFilename());
@@ -9083,7 +9086,7 @@ function addAlternateGreeting(template, greeting, index, getArray, popup) {
  */
 async function createOrEditCharacter(e) {
     $('#rm_info_avatar').html('');
-    const formData = new FormData($('#form_create').get(0));
+    const formData = new FormData(/** @type {HTMLFormElement} */($('#form_create').get(0)));
     formData.set('fav', String(fav_ch_checked));
     const isNewChat = e instanceof CustomEvent && e.type === 'newChat';
 
@@ -9165,7 +9168,7 @@ async function createOrEditCharacter(e) {
 
             $('#character_popup-button-h3').text('Create character');
 
-            create_save.avatar = '';
+            create_save.avatar = null;
 
             $('#add_avatar_button').replaceWith(
                 $('#add_avatar_button').val('').clone(true),
@@ -10173,9 +10176,6 @@ async function doGetChatName() {
     return getCurrentChatDetails().sessionName;
 }
 
-const isPwaMode = window.navigator.standalone;
-if (isPwaMode) { $('body').addClass('PWA'); }
-
 function doCharListDisplaySwitch() {
     power_user.charListGrid = !power_user.charListGrid;
     document.body.classList.toggle('charListGrid', power_user.charListGrid);
@@ -10320,86 +10320,43 @@ function doDrawerOpenClick() {
 /**
  * Event handler to open or close a navbar drawer when a navbar icon is clicked.
  * Handles click events on .drawer-toggle elements.
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function doNavbarIconClick() {
+export async function doNavbarIconClick() {
     const icon = $(this).find('.drawer-icon');
     const drawer = $(this).parent().find('.drawer-content');
-    if (drawer.hasClass('resizing')) { return; }
     const drawerWasOpenAlready = $(this).parent().find('.drawer-content').hasClass('openDrawer');
     const targetDrawerID = $(this).parent().find('.drawer-content').attr('id');
-    const pinnedDrawerClicked = drawer.hasClass('pinnedOpen');
 
-    if (!drawerWasOpenAlready) { //to open the drawer
-        $('.openDrawer').not('.pinnedOpen').addClass('resizing').each((_, el) => {
-            slideToggle(el, {
-                ...getSlideToggleOptions(),
-                onAnimationEnd: function (el) {
-                    el.closest('.drawer-content').classList.remove('resizing');
-                },
-            });
-        });
-        $('.openIcon').not('.drawerPinnedOpen').toggleClass('closedIcon openIcon');
-        $('.openDrawer').not('.pinnedOpen').toggleClass('closedDrawer openDrawer');
+    if (!drawerWasOpenAlready) {
+        const $openDrawers = $('.openDrawer:not(.pinnedOpen)');
+        const $openIcons = $('.openIcon:not(.drawerPinnedOpen)');
+        for (const iconEl of $openIcons) {
+            $(iconEl).toggleClass('closedIcon openIcon');
+        }
+        for (const el of $openDrawers) {
+            $(el).toggleClass('closedDrawer openDrawer');
+        }
+        if ($openDrawers.length) {
+            await delay(animation_duration);
+        }
         icon.toggleClass('openIcon closedIcon');
         drawer.toggleClass('openDrawer closedDrawer');
 
-        //console.log(targetDrawerID);
         if (targetDrawerID === 'right-nav-panel') {
-            $(this).closest('.drawer').find('.drawer-content').addClass('resizing').each((_, el) => {
-                slideToggle(el, {
-                    ...getSlideToggleOptions(),
-                    elementDisplayStyle: 'flex',
-                    onAnimationEnd: function (el) {
-                        el.closest('.drawer-content').classList.remove('resizing');
-                        favsToHotswap();
-                        $('#rm_print_characters_block').trigger('scroll');
-                    },
-                });
-            });
-        } else {
-            $(this).closest('.drawer').find('.drawer-content').addClass('resizing').each((_, el) => {
-                slideToggle(el, {
-                    ...getSlideToggleOptions(),
-                    onAnimationEnd: function (el) {
-                        el.closest('.drawer-content').classList.remove('resizing');
-                    },
-                });
-            });
+            favsToHotswap();
+            $('#rm_print_characters_block').trigger('scroll');
         }
 
         // Set the height of "autoSetHeight" textareas within the drawer to their scroll height
         if (!CSS.supports('field-sizing', 'content')) {
-            $(this).closest('.drawer').find('.drawer-content textarea.autoSetHeight').each(async function () {
-                await resetScrollHeight($(this));
-                return;
-            });
+            const textareas = $(this).closest('.drawer').find('.drawer-content textarea.autoSetHeight');
+            for (const textarea of textareas) {
+                await resetScrollHeight($(textarea));
+            }
         }
-
-    } else if (drawerWasOpenAlready) { //to close manually
+    } else if (drawerWasOpenAlready) {
         icon.toggleClass('closedIcon openIcon');
-
-        if (pinnedDrawerClicked) {
-            $(drawer).addClass('resizing').each((_, el) => {
-                slideToggle(el, {
-                    ...getSlideToggleOptions(),
-                    onAnimationEnd: function (el) {
-                        el.classList.remove('resizing');
-                    },
-                });
-            });
-        }
-        else {
-            $('.openDrawer').not('.pinnedOpen').addClass('resizing').each((_, el) => {
-                slideToggle(el, {
-                    ...getSlideToggleOptions(),
-                    onAnimationEnd: function (el) {
-                        el.closest('.drawer-content').classList.remove('resizing');
-                    },
-                });
-            });
-        }
-
         drawer.toggleClass('closedDrawer openDrawer');
     }
 }
@@ -10803,23 +10760,23 @@ jQuery(async function () {
 
     //menu buttons setup
 
-    $('#rm_button_settings').click(function () {
+    $('#rm_button_settings').on('click', function () {
         selected_button = 'settings';
         selectRightMenuWithAnimation('rm_api_block');
     });
-    $('#rm_button_characters').click(function () {
+    $('#rm_button_characters').on('click', function () {
         selected_button = 'characters';
         select_rm_characters();
     });
-    $('#rm_button_back').click(function () {
+    $('#rm_button_back').on('click', function () {
         selected_button = 'characters';
         select_rm_characters();
     });
-    $('#rm_button_create').click(function () {
+    $('#rm_button_create').on('click', function () {
         selected_button = 'create';
         select_rm_create();
     });
-    $('#rm_button_selected_ch').click(function () {
+    $('#rm_button_selected_ch').on('click', function () {
         if (selected_group) {
             select_group_chats(selected_group);
         } else {
@@ -10914,7 +10871,7 @@ jQuery(async function () {
         callPopup('<h3>' + t`Delete the Chat File?` + '</h3>', 'del_chat');
     });
 
-    $('#advanced_div').click(function () {
+    $('#advanced_div').on('click', function () {
         if (!is_advanced_char_open) {
             is_advanced_char_open = true;
             $('#character_popup').css({ 'display': 'flex', 'opacity': 0.0 }).addClass('open');
@@ -10929,7 +10886,7 @@ jQuery(async function () {
         }
     });
 
-    $('#character_cross').click(function () {
+    $('#character_cross').on('click', function () {
         is_advanced_char_open = false;
         $('#character_popup').transition({
             opacity: 0,
@@ -10939,12 +10896,12 @@ jQuery(async function () {
         setTimeout(function () { $('#character_popup').css('display', 'none'); }, animation_duration);
     });
 
-    $('#character_popup_ok').click(function () {
+    $('#character_popup_ok').on('click', function () {
         is_advanced_char_open = false;
         $('#character_popup').css('display', 'none');
     });
 
-    $('#dialogue_popup_ok').click(async function (e, customData) {
+    $('#dialogue_popup_ok').on('click', async function (_e, customData) {
         const fromSlashCommand = customData?.fromSlashCommand || false;
         dialogueCloseStop = false;
         $('#shadow_popup').transition({
@@ -10974,7 +10931,7 @@ jQuery(async function () {
                 hideLoader();
             } else {  // Open the history view again after 2 seconds (delay to avoid edge cases for deleting last chat).
                 setTimeout(function () {
-                    $('#option_select_chat').click();
+                    $('#option_select_chat').trigger('click');
                     $('#options').hide();  // hide option popup menu
                     hideLoader();
                 }, 2000);
@@ -10985,18 +10942,16 @@ jQuery(async function () {
             if (popup_type == 'input') {
                 dialogueResolve($('#dialogue_popup_input').val());
                 $('#dialogue_popup_input').val('');
-
             }
             else {
                 dialogueResolve(true);
-
             }
 
             dialogueResolve = null;
         }
     });
 
-    $('#dialogue_popup_cancel').click(function (e) {
+    $('#dialogue_popup_cancel').on('click', function (e) {
         dialogueCloseStop = false;
         $('#shadow_popup').transition({
             opacity: 0,
@@ -11009,21 +10964,20 @@ jQuery(async function () {
             $('#dialogue_popup').removeClass('large_dialogue_popup');
         }, animation_duration);
 
-        //$("#shadow_popup").css("opacity:", 0.0);
         popup_type = '';
 
         if (dialogueResolve) {
             dialogueResolve(false);
             dialogueResolve = null;
         }
-
     });
 
-    $('#add_avatar_button').change(function () {
-        read_avatar_load(this);
+    $('#add_avatar_button').on('change', function () {
+        const inputElement = /** @type {HTMLInputElement} */ (this);
+        read_avatar_load(inputElement);
     });
 
-    $('#form_create').submit(createOrEditCharacter);
+    $('#form_create').on('submit', (e) => createOrEditCharacter(e.originalEvent));
 
     $('#delete_button').on('click', async function () {
         if (this_chid === undefined || !characters[this_chid]) {
@@ -11034,7 +10988,7 @@ jQuery(async function () {
         let deleteChats = false;
 
         const confirm = await Popup.show.confirm(t`Delete the character?`, await renderTemplateAsync('deleteConfirm'), {
-            onClose: () => deleteChats = !!$('#del_char_checkbox').prop('checked'),
+            onClose: () => { deleteChats = !!$('#del_char_checkbox').prop('checked'); },
         });
         if (!confirm) {
             return;
@@ -11155,7 +11109,7 @@ jQuery(async function () {
 
     ///////////////////////////////////////////////////////////////////////////////////
 
-    $('#api_button').click(function (e) {
+    $('#api_button').on('click', function (e) {
         if ($('#api_url_text').val() != '') {
             let value = formatKoboldUrl(String($('#api_url_text').val()).trim());
 
@@ -11296,7 +11250,7 @@ jQuery(async function () {
             if ((selected_group || this_chid !== undefined) && !is_send_press) {
                 let deleteCurrentChat = false;
                 const result = await Popup.show.confirm(t`Start new chat?`, await renderTemplateAsync('newChatConfirm'), {
-                    onClose: () => deleteCurrentChat = !!$('#del_chat_checkbox').prop('checked'),
+                    onClose: () => { deleteCurrentChat = !!$('#del_chat_checkbox').prop('checked'); },
                 });
                 if (!result) {
                     return;
@@ -11400,7 +11354,7 @@ jQuery(async function () {
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     //functionality for the cancel delete messages button, reverts to normal display of input form
-    $('#dialogue_del_mes_cancel').click(function () {
+    $('#dialogue_del_mes_cancel').on('click', function () {
         $('#dialogue_del_mes').css('display', 'none');
         $('#send_form').css('display', css_send_form_display);
         $('.del_checkbox').each(function () {
@@ -11540,7 +11494,7 @@ jQuery(async function () {
 
     //////////////////////////////////////////////////////////////
 
-    $('#select_chat_cross').click(function () {
+    $('#select_chat_cross').on('click', function () {
         $('#shadow_select_chat_popup').transition({
             opacity: 0,
             duration: animation_duration,
@@ -11634,8 +11588,10 @@ jQuery(async function () {
                 edit_textarea.height(0);
                 edit_textarea.height(edit_textarea[0].scrollHeight);
             }
-            edit_textarea.focus();
-            edit_textarea[0].setSelectionRange(     //this sets the cursor at the end of the text
+            edit_textarea.trigger('focus');
+            const textAreaElement = /** @type {HTMLTextAreaElement} */ (edit_textarea[0]);
+            // Sets the cursor at the end of the text
+            textAreaElement.setSelectionRange(
                 String(edit_textarea.val()).length,
                 String(edit_textarea.val()).length,
             );
@@ -11887,8 +11843,8 @@ jQuery(async function () {
     //Select chat
 
     //**************************CHARACTER IMPORT EXPORT*************************//
-    $('#character_import_button').click(function () {
-        $('#character_import_file').click();
+    $('#character_import_button').on('click', function () {
+        $('#character_import_file').trigger('click');
     });
 
     $('#character_import_file').on('change', async function (e) {
@@ -11956,12 +11912,16 @@ jQuery(async function () {
         }
     });
     //**************************CHAT IMPORT EXPORT*************************//
-    $('#chat_import_button').click(function () {
-        $('#chat_import_file').click();
+    $('#chat_import_button').on('click', function () {
+        $('#chat_import_file').trigger('click');
     });
 
     $('#chat_import_file').on('change', async function (e) {
-        const file = e.target.files[0];
+        const targetElement = /** @type {HTMLInputElement} */ (e.target);
+        if (!(targetElement instanceof HTMLInputElement)) {
+            return;
+        }
+        const file = targetElement.files[0];
 
         if (!file) {
             return;
@@ -11983,7 +11943,7 @@ jQuery(async function () {
         const format = ext[1].toLowerCase();
         $('#chat_import_file_type').val(format);
 
-        const formData = new FormData($('#form_import_chat').get(0));
+        const formData = new FormData(/** @type {HTMLFormElement} */($('#form_import_chat').get(0)));
         formData.append('user_name', name1);
         $('#select_chat_div').html('');
 
@@ -11994,12 +11954,12 @@ jQuery(async function () {
         }
     });
 
-    $('#rm_button_group_chats').click(function () {
+    $('#rm_button_group_chats').on('click', function () {
         selected_button = 'group_chats';
         select_group_chats();
     });
 
-    $('#rm_button_back_from_group').click(function () {
+    $('#rm_button_back_from_group').on('click', function () {
         selected_button = 'characters';
         select_rm_characters();
     });
@@ -12028,8 +11988,8 @@ jQuery(async function () {
 
     $('.drawer-toggle').on('click', doNavbarIconClick);
 
-    $('html').on('touchstart mousedown', function (e) {
-        var clickTarget = $(e.target);
+    $('html').on('touchstart mousedown', async function (e) {
+        const clickTarget = $(e.target);
 
         if (isExportPopupOpen
             && clickTarget.closest('#export_button').length == 0
@@ -12050,33 +12010,26 @@ jQuery(async function () {
             '#toast-container',
             '.select2-results',
         ];
+
         for (const id of forbiddenTargets) {
             if (clickTarget.closest(id).length > 0) {
                 return;
             }
         }
 
-        var targetParentHasOpenDrawer = clickTarget.parents('.openDrawer').length;
-        if (clickTarget.hasClass('drawer-icon') == false && !clickTarget.hasClass('openDrawer')) {
-            if ($('.openDrawer').length !== 0) {
-                if (targetParentHasOpenDrawer === 0) {
-                    //console.log($('.openDrawer').not('.pinnedOpen').length);
-                    $('.openDrawer').not('.pinnedOpen').addClass('resizing').each((_, el) => {
-                        slideToggle(el, {
-                            ...getSlideToggleOptions(),
-                            onAnimationEnd: (el) => {
-                                el.closest('.drawer-content').classList.remove('resizing');
-                            },
-                        });
-                    });
-                    $('.openIcon').not('.drawerPinnedOpen').toggleClass('closedIcon openIcon');
-                    $('.openDrawer').not('.pinnedOpen').toggleClass('closedDrawer openDrawer');
-                }
+        // This autocloses open drawers that are not pinned if a click happens inside the app which does not target them.
+        const targetParentHasOpenDrawer = clickTarget.parents('.openDrawer').length;
+        if (!clickTarget.hasClass('drawer-icon') && !clickTarget.hasClass('openDrawer')) {
+            const $openDrawers = $('.openDrawer').not('.pinnedOpen');
+            if ($openDrawers.length && targetParentHasOpenDrawer === 0) {
+                // Toggle icon and drawer classes
+                $('.openIcon').not('.drawerPinnedOpen').toggleClass('closedIcon openIcon');
+                $openDrawers.toggleClass('closedDrawer openDrawer');
             }
         }
     });
 
-    $(document).on('click', '.inline-drawer-toggle', function (e) {
+    $(document).on('click', '.inline-drawer-toggle', async function (e) {
         if ($(e.target).hasClass('text_pole')) {
             return;
         }
@@ -12085,6 +12038,7 @@ jQuery(async function () {
         const drawerContent = drawer.find('>.inline-drawer-content');
         icon.toggleClass('down up');
         icon.toggleClass('fa-circle-chevron-down fa-circle-chevron-up');
+        drawer.trigger('inline-drawer-toggle');
         drawerContent.stop().slideToggle({
             complete: () => {
                 $(this).css('height', '');
@@ -12093,10 +12047,10 @@ jQuery(async function () {
 
         // Set the height of "autoSetHeight" textareas within the inline-drawer to their scroll height
         if (!CSS.supports('field-sizing', 'content')) {
-            drawerContent.find('textarea.autoSetHeight').each(async function () {
-                await resetScrollHeight($(this));
-                return;
-            });
+            const textareas = drawerContent.find('textarea.autoSetHeight');
+            for (const textarea of textareas) {
+                await resetScrollHeight($(textarea));
+            }
         }
     });
 
@@ -12181,7 +12135,7 @@ jQuery(async function () {
         if (!(e.target instanceof HTMLElement)) return;
         if (e.target.matches('#OpenAllWIEntries')) {
             document.querySelectorAll('#world_popup_entries_list .inline-drawer').forEach((/** @type {HTMLElement} */ drawer) => {
-                toggleDrawer(drawer, true);
+                delay(0).then(() => toggleDrawer(drawer, true));
             });
         } else if (e.target.matches('#CloseAllWIEntries')) {
             document.querySelectorAll('#world_popup_entries_list .inline-drawer').forEach((/** @type {HTMLElement} */ drawer) => {
@@ -12211,7 +12165,7 @@ jQuery(async function () {
                 return;
             }
             if (isEditVisible && power_user.auto_save_msg_edits === true) {
-                $(`#chat .mes[mesid="${this_edit_mes_id}"] .mes_edit_done`).click();
+                $(`#chat .mes[mesid="${this_edit_mes_id}"] .mes_edit_done`).trigger('click');
                 closeMessageEditor('reasoning');
                 $('#send_textarea').focus();
                 return;
@@ -12226,7 +12180,8 @@ jQuery(async function () {
     });
 
     $('#char-management-dropdown').on('change', async (e) => {
-        let target = $(e.target.selectedOptions).attr('id');
+        const targetElement = /** @type {HTMLSelectElement} */ (e.target);
+        const target = $(targetElement.selectedOptions).attr('id');
         switch (target) {
             case 'set_character_world':
                 openCharacterWorldPopup();
