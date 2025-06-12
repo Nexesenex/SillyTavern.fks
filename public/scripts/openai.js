@@ -1858,8 +1858,9 @@ function saveModelList(data) {
             const selectedModel = model_list.find(model => model.id === oai_settings.mistralai_model);
             if (!selectedModel) {
                 oai_settings.mistralai_model = model_list.find(model => model?.capabilities?.completion_chat)?.id;
-                $('#model_mistralai_select').val(oai_settings.mistralai_model).trigger('change');
             }
+
+            $('#model_mistralai_select').val(oai_settings.mistralai_model).trigger('change');
         }
     }
 
@@ -1956,7 +1957,7 @@ function saveModelList(data) {
 }
 
 function appendOpenRouterOptions(model_list, groupModels = false, sort = false) {
-    $('#model_openrouter_select').append($('<option>', { value: openrouter_website_model, text: 'Use OpenRouter website setting' }));
+    $('#model_openrouter_select').append($('<option>', { value: openrouter_website_model, text: t`Use OpenRouter website setting` }));
 
     const appendOption = (model, parent = null) => {
         (parent || $('#model_openrouter_select')).append(
@@ -4628,6 +4629,11 @@ async function onModelChange() {
     }
 
     if ($(this).is('#model_google_select')) {
+        if (!value) {
+            console.debug('Null Google model selected. Ignoring.');
+            return;
+        }
+
         console.log('Google model changed to', value);
         oai_settings.google_model = value;
     }
@@ -4638,12 +4644,14 @@ async function onModelChange() {
     }
 
     if ($(this).is('#model_mistralai_select')) {
+        if (!value) {
+            console.debug('Null MistralAI model selected. Ignoring.');
+            return;
+        }
         // Upgrade old mistral models to new naming scheme
         // would have done this in loadOpenAISettings, but it wasn't updating on preset change?
         if (value === 'mistral-medium' || value === 'mistral-small') {
             value = value + '-latest';
-        } else if (value === '') {
-            value = default_settings.mistralai_model;
         }
         console.log('MistralAI model changed to', value);
         oai_settings.mistralai_model = value;
