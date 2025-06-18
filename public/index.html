@@ -3192,12 +3192,15 @@
                                 <h4 data-i18n="Google Model">Google Model</h4>
                                 <select id="model_google_select">
                                     <optgroup label="Gemini 2.5">
+                                        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
                                         <option value="gemini-2.5-pro-preview-06-05">gemini-2.5-pro-preview-06-05</option>
                                         <option value="gemini-2.5-pro-preview-05-06">gemini-2.5-pro-preview-05-06</option>
                                         <option value="gemini-2.5-pro-preview-03-25">gemini-2.5-pro-preview-03-25</option>
                                         <option value="gemini-2.5-pro-exp-03-25">gemini-2.5-pro-exp-03-25</option>
+                                        <option value="gemini-2.5-flash">gemini-2.5-flash</option>
                                         <option value="gemini-2.5-flash-preview-05-20">gemini-2.5-flash-preview-05-20</option>
                                         <option value="gemini-2.5-flash-preview-04-17">gemini-2.5-flash-preview-04-17</option>
+                                        <option value="gemini-2.5-flash-lite-preview-06-17">gemini-2.5-flash-lite-preview-06-17</option>
                                     </optgroup>
                                     <optgroup label="Gemini 2.0">
                                         <option value="gemini-2.0-pro-exp-02-05">gemini-2.0-pro-exp-02-05 → 2.5-pro-exp-03-25</option>
@@ -3362,12 +3365,15 @@
                                 <select id="model_vertexai_select">
                                     <!-- data-mode="full" is for models that require a service account -->
                                     <optgroup label="Gemini 2.5">
+                                        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
                                         <option value="gemini-2.5-pro-preview-06-05">gemini-2.5-pro-preview-06-05</option>
                                         <option value="gemini-2.5-pro-preview-05-06">gemini-2.5-pro-preview-05-06</option>
                                         <option value="gemini-2.5-pro-preview-03-25">gemini-2.5-pro-preview-03-25</option>
                                         <option value="gemini-2.5-pro-exp-03-25" data-mode="full">gemini-2.5-pro-exp-03-25</option>
+                                        <option value="gemini-2.5-flash">gemini-2.5-flash</option>
                                         <option value="gemini-2.5-flash-preview-05-20">gemini-2.5-flash-preview-05-20</option>
                                         <option value="gemini-2.5-flash-preview-04-17">gemini-2.5-flash-preview-04-17</option>
+                                        <option value="gemini-2.5-flash-lite-preview-06-17">gemini-2.5-flash-lite-preview-06-17</option>
                                     </optgroup>
                                     <optgroup label="Gemini 2.0">
                                         <option value="gemini-2.0-flash-exp" data-mode="full">gemini-2.0-flash-exp</option>
@@ -3704,13 +3710,17 @@
                             </h4>
                             <select id="custom_prompt_post_processing" class="text_pole" title="Applies additional processing to the prompt before sending it to the API." data-i18n="[title]Applies additional processing to the prompt before sending it to the API.">
                                 <option data-i18n="prompt_post_processing_none" value="">None</option>
-                                <option data-i18n="prompt_post_processing_merge" value="merge">Merge consecutive roles (no tools)</option>
-                                <option data-i18n="prompt_post_processing_merge_tools" value="merge_tools">Merge consecutive roles (with tools)</option>
-                                <option data-i18n="prompt_post_processing_semi" value="semi">Semi-strict (alternating roles; no tools)</option>
-                                <option data-i18n="prompt_post_processing_semi_tools" value="semi_tools">Semi-strict (alternating roles; with tools)</option>
-                                <option data-i18n="prompt_post_processing_strict" value="strict">Strict (user first, alternating roles; no tools)</option>
-                                <option data-i18n="prompt_post_processing_strict_tools" value="strict_tools">Strict (user first, alternating roles; with tools)</option>
-                                <option data-i18n="prompt_post_processing_single" value="single">Single user message (no tools)</option>
+                                <optgroup label="With Tools">
+                                    <option data-i18n="prompt_post_processing_merge_tools" value="merge_tools">Merge consecutive roles (with tools)</option>
+                                    <option data-i18n="prompt_post_processing_semi_tools" value="semi_tools">Semi-strict (alternating roles; with tools)</option>
+                                    <option data-i18n="prompt_post_processing_strict_tools" value="strict_tools">Strict (user first, alternating roles; with tools)</option>
+                                </optgroup>
+                                <optgroup label="No Tools">
+                                    <option data-i18n="prompt_post_processing_merge" value="merge">Merge consecutive roles (no tools)</option>
+                                    <option data-i18n="prompt_post_processing_semi" value="semi">Semi-strict (alternating roles; no tools)</option>
+                                    <option data-i18n="prompt_post_processing_strict" value="strict">Strict (user first, alternating roles; no tools)</option>
+                                    <option data-i18n="prompt_post_processing_single" value="single">Single user message (no tools)</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="flex-container flex">
