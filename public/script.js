@@ -4,9 +4,7 @@ import {
     Fuse,
     DOMPurify,
     hljs,
-    localforage,
     Handlebars,
-    DiffMatchPatch,
     SVGInject,
     Popper,
     initLibraryShims,
@@ -19,10 +17,11 @@ import {
     generateKoboldWithStreaming,
     kai_settings,
     loadKoboldSettings,
-    formatKoboldUrl,
     getKoboldGenerationData,
     kai_flags,
-    setKoboldFlags,
+    koboldai_settings,
+    koboldai_setting_names,
+    initKoboldSettings,
 } from './scripts/kai-settings.js';
 
 import {
@@ -205,6 +204,7 @@ import {
     applyTagsOnCharacterSelect,
     applyTagsOnGroupSelect,
     tag_import_setting,
+    applyCharacterTagsToMessageDivs,
 } from './scripts/tags.js';
 import {
     SECRET_KEYS,
@@ -297,6 +297,7 @@ import { extractReasoningFromData, initReasoning, parseReasoningInSwipes, Prompt
 import { accountStorage } from './scripts/util/AccountStorage.js';
 import { initWelcomeScreen, openPermanentAssistantChat, openPermanentAssistantCard, getPermanentAssistantAvatar } from './scripts/welcome-screen.js';
 import { initDataMaid } from './scripts/data-maid.js';
+import { clearItemizedPrompts, deleteItemizedPrompts, findItemizedPromptSet, initItemizedPrompts, itemizedParams, itemizedPrompts, loadItemizedPrompts, promptItemize, replaceItemizedPromptText, saveItemizedPrompts } from './scripts/itemized-prompts.js';
 
 // API OBJECT FOR EXTERNAL WIRING
 globalThis.SillyTavern = {
@@ -304,7 +305,6 @@ globalThis.SillyTavern = {
     getContext,
 };
 
-//exporting functions and vars for mods
 export {
     user_avatar,
     setUserAvatar,
@@ -314,6 +314,17 @@ export {
     isOdd,
     countOccurrences,
     renderTemplate,
+    promptItemize,
+    itemizedPrompts,
+    saveItemizedPrompts,
+    loadItemizedPrompts,
+    itemizedParams,
+    clearItemizedPrompts,
+    replaceItemizedPromptText,
+    deleteItemizedPrompts,
+    findItemizedPromptSet,
+    koboldai_settings,
+    koboldai_setting_names,
 };
 
 /**
@@ -577,9 +588,6 @@ export let mesForShowdownParse; //intended to be used as a context to compare sh
 export let converter;
 
 // array for prompt token calculations
-console.debug('initializing Prompt Itemization Array on Startup');
-const promptStorage = localforage.createInstance({ name: 'SillyTavern_Prompts' });
-export let itemizedPrompts = [];
 
 export const systemUserName = 'SillyTavern System';
 export const neutralCharacterName = 'Assistant';
@@ -882,6 +890,7 @@ export let create_save = {
     depth_prompt_depth: depth_prompt_depth_default,
     depth_prompt_role: depth_prompt_role_default,
     extensions: {},
+    extra_books: [],
 };
 
 //animation right menu
@@ -891,8 +900,6 @@ export let animation_easing = 'ease-in-out';
 let popup_type = '';
 let chat_file_for_del = '';
 export let online_status = 'no_connection';
-
-export let api_server = '';
 
 export let is_send_press = false; //Send generation
 
@@ -904,9 +911,6 @@ var this_edit_mes_id;
 
 //settings
 export let settings;
-export let koboldai_settings;
-export let koboldai_setting_names;
-var preset_settings = 'gui';
 export let amount_gen = 80; //default max length of AI generated responses
 export let max_context = 2048;
 
@@ -927,8 +931,6 @@ var kobold_horde_model = '';
 
 export let token;
 
-var PromptArrayItemForRawPromptDisplay;
-var priorPromptArrayItemForRawPromptDisplay;
 
 /** The tag of the active character. (NOT the id) */
 export let active_character = '';
@@ -1003,6 +1005,7 @@ async function firstLoadInit() {
     initDefaultSlashCommands();
     initTextGenModels();
     initOpenAI();
+    initKoboldSettings();
     initSystemPrompts();
     initExtensions();
     initExtensionSlashCommands();
@@ -1037,6 +1040,7 @@ async function firstLoadInit() {
     await initScrapers();
     initCustomSelectedSamplers();
     initDataMaid();
+    initItemizedPrompts();
     addDebugFunctions();
     doDailyExtensionUpdatesCheck();
     await hideLoader();
@@ -1101,144 +1105,12 @@ export function setActiveGroup(entityOrKey) {
     if (active_group) active_character = null;
 }
 
-/**
- * Gets the itemized prompts for a chat.
- * @param {string} chatId Chat ID to load
- */
-export async function loadItemizedPrompts(chatId) {
-    try {
-        if (!chatId) {
-            itemizedPrompts = [];
-            return;
-        }
-
-        itemizedPrompts = await promptStorage.getItem(chatId);
-
-        if (!itemizedPrompts) {
-            itemizedPrompts = [];
-        }
-    } catch {
-        console.log('Error loading itemized prompts for chat', chatId);
-        itemizedPrompts = [];
-    }
-}
-
-/**
- * Saves the itemized prompts for a chat.
- * @param {string} chatId Chat ID to save itemized prompts for
- */
-export async function saveItemizedPrompts(chatId) {
-    try {
-        if (!chatId) {
-            return;
-        }
-
-        await promptStorage.setItem(chatId, itemizedPrompts);
-    } catch {
-        console.log('Error saving itemized prompts for chat', chatId);
-    }
-}
-
-/**
- * Replaces the itemized prompt text for a message.
- * @param {number} mesId Message ID to get itemized prompt for
- * @param {string} promptText New raw prompt text
- * @returns
- */
-export async function replaceItemizedPromptText(mesId, promptText) {
-    if (!Array.isArray(itemizedPrompts)) {
-        itemizedPrompts = [];
-    }
-
-    const itemizedPrompt = itemizedPrompts.find(x => x.mesId === mesId);
-
-    if (!itemizedPrompt) {
-        return;
-    }
-
-    itemizedPrompt.rawPrompt = promptText;
-}
-
-/**
- * Deletes the itemized prompts for a chat.
- * @param {string} chatId Chat ID to delete itemized prompts for
- */
-export async function deleteItemizedPrompts(chatId) {
-    try {
-        if (!chatId) {
-            return;
-        }
-
-        await promptStorage.removeItem(chatId);
-    } catch {
-        console.log('Error deleting itemized prompts for chat', chatId);
-    }
-}
-
-/**
- * Empties the itemized prompts array and caches.
- */
-export async function clearItemizedPrompts() {
-    try {
-        await promptStorage.clear();
-        itemizedPrompts = [];
-    } catch {
-        console.log('Error clearing itemized prompts');
-    }
-}
-
 async function getStatusHorde() {
     try {
         const hordeStatus = await checkHordeStatus();
         setOnlineStatus(hordeStatus ? t`Connected` : 'no_connection');
     }
     catch {
-        setOnlineStatus('no_connection');
-    }
-
-    return resultCheckStatus();
-}
-
-async function getStatusKobold() {
-    let endpoint = api_server;
-
-    if (!endpoint) {
-        console.warn('No endpoint for status check');
-        setOnlineStatus('no_connection');
-        return resultCheckStatus();
-    }
-
-    try {
-        const response = await fetch('/api/backends/kobold/status', {
-            method: 'POST',
-            headers: getRequestHeaders(),
-            body: JSON.stringify({
-                main_api,
-                api_server: endpoint,
-            }),
-            signal: abortStatusCheck.signal,
-        });
-
-        const data = await response.json();
-
-        setOnlineStatus(data?.model ?? 'no_connection');
-
-        if (!data.koboldUnitedVersion) {
-            throw new Error('Missing mandatory Kobold version in data:', data);
-        }
-
-        // Determine instruct mode preset
-        autoSelectInstructPreset(online_status);
-
-        // determine if we can use stop sequence and streaming
-        setKoboldFlags(data.koboldUnitedVersion, data.koboldCppVersion);
-
-        // We didn't get a 200 status code, but the endpoint has an explanation. Which means it DID connect, but I digress.
-        if (online_status === 'no_connection' && data.response) {
-            toastr.error(data.response, t`API Error`, { timeOut: 5000, preventDuplicates: true });
-        }
-    } catch (err) {
-        console.error('Error getting status', err);
         setOnlineStatus('no_connection');
     }
 
@@ -2088,7 +1960,7 @@ export async function clearChat() {
     } else { console.debug('saw no avatars'); }
 
     await saveItemizedPrompts(getCurrentChatId());
-    itemizedPrompts = [];
+    itemizedPrompts.length = 0;
 }
 
 export async function deleteLastMessage() {
@@ -2753,6 +2625,8 @@ export function addOneMessage(mes, { type = 'normal', insertAfter = null, scroll
     if (!insertAfter && !insertBefore && scroll) {
         scrollChatToBottom();
     }
+
+    applyCharacterTagsToMessageDivs({ mesIds: newMessageId });
 }
 
 /**
@@ -3560,7 +3434,7 @@ class StreamingProcessor {
 
             // Token count update.
             const tokenCountText = this.reasoningHandler.reasoning + processedText;
-            const currentTokenCount = isFinal && power_user.message_token_count_enabled ? getTokenCount(tokenCountText, 0) : 0;
+            const currentTokenCount = isFinal && power_user.message_token_count_enabled ? await getTokenCountAsync(tokenCountText, 0) : 0;
             if (currentTokenCount) {
                 chat[messageId]['extra']['token_count'] = currentTokenCount;
                 if (this.messageTokenCounterDom instanceof HTMLElement) {
@@ -3795,11 +3669,11 @@ export async function generateRaw(prompt, api, instructOverride, quietToLoud, sy
         switch (api) {
             case 'kobold':
             case 'koboldhorde':
-                if (preset_settings === 'gui') {
-                    generateData = { prompt: prompt, gui_settings: true, max_length: amount_gen, max_context_length: max_context, api_server };
+                if (kai_settings.preset_settings === 'gui') {
+                    generateData = { prompt: prompt, gui_settings: true, max_length: amount_gen, max_context_length: max_context, api_server: kai_settings.api_server };
                 } else {
                     const isHorde = api === 'koboldhorde';
-                    const koboldSettings = koboldai_settings[koboldai_setting_names[preset_settings]];
+                    const koboldSettings = koboldai_settings[koboldai_setting_names[kai_settings.preset_settings]];
                     generateData = getKoboldGenerationData(prompt, koboldSettings, amount_gen, max_context, isHorde, 'quiet');
                 }
                 TempResponseLength.restore(api);
@@ -4950,12 +4824,12 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 gui_settings: true,
                 max_length: maxLength,
                 max_context_length: max_context,
-                api_server,
+                api_server: kai_settings.api_server,
             };
 
-            if (preset_settings != 'gui') {
+            if (kai_settings.preset_settings != 'gui') {
                 const isHorde = main_api == 'koboldhorde';
-                const presetSettings = koboldai_settings[koboldai_setting_names[preset_settings]];
+                const presetSettings = koboldai_settings[koboldai_setting_names[kai_settings.preset_settings]];
                 const maxContext = (adjustedParams && horde_settings.auto_adjust_context_length) ? adjustedParams.maxContextLength : max_context;
                 generate_data = getKoboldGenerationData(finalPrompt, presetSettings, maxLength, maxContext, isHorde, type);
             }
@@ -5721,231 +5595,6 @@ async function duplicateCharacter() {
     }
 
     return '';
-}
-
-export async function itemizedParams(itemizedPrompts, thisPromptSet, incomingMesId) {
-    const params = {
-        charDescriptionTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].charDescription),
-        charPersonalityTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].charPersonality),
-        scenarioTextTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].scenarioText),
-        userPersonaStringTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].userPersona),
-        worldInfoStringTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].worldInfoString),
-        allAnchorsTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].allAnchors),
-        summarizeStringTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].summarizeString),
-        authorsNoteStringTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].authorsNoteString),
-        smartContextStringTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].smartContextString),
-        beforeScenarioAnchorTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].beforeScenarioAnchor),
-        afterScenarioAnchorTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].afterScenarioAnchor),
-        zeroDepthAnchorTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].zeroDepthAnchor), // TODO: unused
-        thisPrompt_padding: itemizedPrompts[thisPromptSet].padding,
-        this_main_api: itemizedPrompts[thisPromptSet].main_api,
-        chatInjects: await getTokenCountAsync(itemizedPrompts[thisPromptSet].chatInjects),
-        chatVectorsStringTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].chatVectorsString),
-        dataBankVectorsStringTokens: await getTokenCountAsync(itemizedPrompts[thisPromptSet].dataBankVectorsString),
-        modelUsed: chat[incomingMesId]?.extra?.model,
-        apiUsed: chat[incomingMesId]?.extra?.api,
-        presetName: itemizedPrompts[thisPromptSet].presetName || t`(Unknown)`,
-        messagesCount: String(itemizedPrompts[thisPromptSet].messagesCount ?? ''),
-        examplesCount: String(itemizedPrompts[thisPromptSet].examplesCount ?? ''),
-    };
-
-    const getFriendlyName = (value) => $(`#rm_api_block select option[value="${value}"]`).first().text() || value;
-
-    if (params.apiUsed) {
-        params.apiUsed = getFriendlyName(params.apiUsed);
-    }
-
-    if (params.this_main_api) {
-        params.mainApiFriendlyName = getFriendlyName(params.this_main_api);
-    }
-
-    if (params.chatInjects) {
-        params.ActualChatHistoryTokens = params.ActualChatHistoryTokens - params.chatInjects;
-    }
-
-    if (params.this_main_api == 'openai') {
-        //for OAI API
-        //console.log('-- Counting OAI Tokens');
-
-        //params.finalPromptTokens = itemizedPrompts[thisPromptSet].oaiTotalTokens;
-        params.oaiMainTokens = itemizedPrompts[thisPromptSet].oaiMainTokens;
-        params.oaiStartTokens = itemizedPrompts[thisPromptSet].oaiStartTokens;
-        params.ActualChatHistoryTokens = itemizedPrompts[thisPromptSet].oaiConversationTokens;
-        params.examplesStringTokens = itemizedPrompts[thisPromptSet].oaiExamplesTokens;
-        params.oaiPromptTokens = itemizedPrompts[thisPromptSet].oaiPromptTokens - (params.afterScenarioAnchorTokens + params.beforeScenarioAnchorTokens) + params.examplesStringTokens;
-        params.oaiBiasTokens = itemizedPrompts[thisPromptSet].oaiBiasTokens;
-        params.oaiJailbreakTokens = itemizedPrompts[thisPromptSet].oaiJailbreakTokens;
-        params.oaiNudgeTokens = itemizedPrompts[thisPromptSet].oaiNudgeTokens;
-        params.oaiImpersonateTokens = itemizedPrompts[thisPromptSet].oaiImpersonateTokens;
-        params.oaiNsfwTokens = itemizedPrompts[thisPromptSet].oaiNsfwTokens;
-        params.finalPromptTokens =
-            params.oaiStartTokens +
-            params.oaiPromptTokens +
-            params.oaiMainTokens +
-            params.oaiNsfwTokens +
-            params.oaiBiasTokens +
-            params.oaiImpersonateTokens +
-            params.oaiJailbreakTokens +
-            params.oaiNudgeTokens +
-            params.ActualChatHistoryTokens +
-            //charDescriptionTokens +
-            //charPersonalityTokens +
-            //allAnchorsTokens +
-            params.worldInfoStringTokens +
-            params.beforeScenarioAnchorTokens +
-            params.afterScenarioAnchorTokens;
-        // Max context size - max completion tokens
-        params.thisPrompt_max_context = (oai_settings.openai_max_context - oai_settings.openai_max_tokens);
-
-        //console.log('-- applying % on OAI tokens');
-        params.oaiStartTokensPercentage = ((params.oaiStartTokens / (params.finalPromptTokens)) * 100).toFixed(2);
-        params.storyStringTokensPercentage = (((params.afterScenarioAnchorTokens + params.beforeScenarioAnchorTokens + params.oaiPromptTokens) / (params.finalPromptTokens)) * 100).toFixed(2);
-        params.ActualChatHistoryTokensPercentage = ((params.ActualChatHistoryTokens / (params.finalPromptTokens)) * 100).toFixed(2);
-        params.promptBiasTokensPercentage = ((params.oaiBiasTokens / (params.finalPromptTokens)) * 100).toFixed(2);
-        params.worldInfoStringTokensPercentage = ((params.worldInfoStringTokens / (params.finalPromptTokens)) * 100).toFixed(2);
-        params.allAnchorsTokensPercentage = ((params.allAnchorsTokens / (params.finalPromptTokens)) * 100).toFixed(2);
-        params.selectedTokenizer = getFriendlyTokenizerName(params.this_main_api).tokenizerName;
-        params.oaiSystemTokens = params.oaiImpersonateTokens + params.oaiJailbreakTokens + params.oaiNudgeTokens + params.oaiStartTokens + params.oaiNsfwTokens + params.oaiMainTokens;
-        params.oaiSystemTokensPercentage = ((params.oaiSystemTokens / (params.finalPromptTokens)) * 100).toFixed(2);
-    } else {
-        //for non-OAI APIs
-        //console.log('-- Counting non-OAI Tokens');
-        params.finalPromptTokens = await getTokenCountAsync(itemizedPrompts[thisPromptSet].finalPrompt);
-        params.storyStringTokens = await getTokenCountAsync(itemizedPrompts[thisPromptSet].storyString) - params.worldInfoStringTokens;
-        params.examplesStringTokens = await getTokenCountAsync(itemizedPrompts[thisPromptSet].examplesString);
-        params.mesSendStringTokens = await getTokenCountAsync(itemizedPrompts[thisPromptSet].mesSendString);
-        params.ActualChatHistoryTokens = params.mesSendStringTokens - (params.allAnchorsTokens - (params.beforeScenarioAnchorTokens + params.afterScenarioAnchorTokens)) + power_user.token_padding;
-        params.instructionTokens = await getTokenCountAsync(itemizedPrompts[thisPromptSet].instruction);
-        params.promptBiasTokens = await getTokenCountAsync(itemizedPrompts[thisPromptSet].promptBias);
-
-        params.totalTokensInPrompt =
-            params.storyStringTokens +     //chardefs total
-            params.worldInfoStringTokens +
-            params.examplesStringTokens + // example messages
-            params.ActualChatHistoryTokens +  //chat history
-            params.allAnchorsTokens +      // AN and/or legacy anchors
-            //afterScenarioAnchorTokens +       //only counts if AN is set to 'after scenario'
-            //zeroDepthAnchorTokens +           //same as above, even if AN not on 0 depth
-            params.promptBiasTokens;       //{{}}
-        //- thisPrompt_padding;  //not sure this way of calculating is correct, but the math results in same value as 'finalPrompt'
-        params.thisPrompt_max_context = itemizedPrompts[thisPromptSet].this_max_context;
-        params.thisPrompt_actual = params.thisPrompt_max_context - params.thisPrompt_padding;
-
-        //console.log('-- applying % on non-OAI tokens');
-        params.storyStringTokensPercentage = ((params.storyStringTokens / (params.totalTokensInPrompt)) * 100).toFixed(2);
-        params.ActualChatHistoryTokensPercentage = ((params.ActualChatHistoryTokens / (params.totalTokensInPrompt)) * 100).toFixed(2);
-        params.promptBiasTokensPercentage = ((params.promptBiasTokens / (params.totalTokensInPrompt)) * 100).toFixed(2);
-        params.worldInfoStringTokensPercentage = ((params.worldInfoStringTokens / (params.totalTokensInPrompt)) * 100).toFixed(2);
-        params.allAnchorsTokensPercentage = ((params.allAnchorsTokens / (params.totalTokensInPrompt)) * 100).toFixed(2);
-        params.selectedTokenizer = itemizedPrompts[thisPromptSet]?.tokenizer || getFriendlyTokenizerName(params.this_main_api).tokenizerName;
-    }
-    return params;
-}
-
-export function findItemizedPromptSet(itemizedPrompts, incomingMesId) {
-    var thisPromptSet = undefined;
-
-    for (var i = 0; i < itemizedPrompts.length; i++) {
-        console.log(`looking for ${incomingMesId} vs ${itemizedPrompts[i].mesId}`);
-        if (itemizedPrompts[i].mesId === incomingMesId) {
-            console.log(`found matching mesID ${i}`);
-            thisPromptSet = i;
-            PromptArrayItemForRawPromptDisplay = i;
-            console.log(`wanting to raw display of ArrayItem: ${PromptArrayItemForRawPromptDisplay} which is mesID ${incomingMesId}`);
-            console.log(itemizedPrompts[thisPromptSet]);
-            break;
-        } else if (itemizedPrompts[i].rawPrompt) {
-            priorPromptArrayItemForRawPromptDisplay = i;
-        }
-    }
-    return thisPromptSet;
-}
-
-async function promptItemize(itemizedPrompts, requestedMesId) {
-    console.log('PROMPT ITEMIZE ENTERED');
-    var incomingMesId = Number(requestedMesId);
-    console.debug(`looking for MesId ${incomingMesId}`);
-    var thisPromptSet = findItemizedPromptSet(itemizedPrompts, incomingMesId);
-
-    if (thisPromptSet === undefined) {
-        console.log(`couldnt find the right mesId. looked for ${incomingMesId}`);
-        console.log(itemizedPrompts);
-        return null;
-    }
-
-    const params = await itemizedParams(itemizedPrompts, thisPromptSet, incomingMesId);
-    const flatten = (rawPrompt) => Array.isArray(rawPrompt) ? rawPrompt.map(x => x.content).join('\n') : rawPrompt;
-
-    const template = params.this_main_api == 'openai'
-        ? await renderTemplateAsync('itemizationChat', params)
-        : await renderTemplateAsync('itemizationText', params);
-
-    const popup = new Popup(template, POPUP_TYPE.TEXT);
-
-    /** @type {HTMLElement} */
-    const diffPrevPrompt = popup.dlg.querySelector('#diffPrevPrompt');
-    if (priorPromptArrayItemForRawPromptDisplay) {
-        diffPrevPrompt.style.display = '';
-        diffPrevPrompt.addEventListener('click', function () {
-            const dmp = new DiffMatchPatch();
-            const text1 = flatten(itemizedPrompts[priorPromptArrayItemForRawPromptDisplay].rawPrompt);
-            const text2 = flatten(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
-
-            dmp.Diff_Timeout = 2.0;
-
-            const d = dmp.diff_main(text1, text2);
-            let ds = dmp.diff_prettyHtml(d);
-            // make it readable
-            ds = ds.replaceAll('background:#e6ffe6;', 'background:#b9f3b9; color:black;');
-            ds = ds.replaceAll('background:#ffe6e6;', 'background:#f5b4b4; color:black;');
-            ds = ds.replaceAll('&para;', '');
-            const container = document.createElement('div');
-            container.innerHTML = DOMPurify.sanitize(ds);
-            const rawPromptWrapper = document.getElementById('rawPromptWrapper');
-            rawPromptWrapper.replaceChildren(container);
-            $('#rawPromptPopup').slideToggle();
-        });
-    } else {
-        diffPrevPrompt.style.display = 'none';
-    }
-    popup.dlg.querySelector('#copyPromptToClipboard').addEventListener('pointerup', async function () {
-        let rawPrompt = itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt;
-        let rawPromptValues = rawPrompt;
-
-        if (Array.isArray(rawPrompt)) {
-            rawPromptValues = rawPrompt.map(x => x.content).join('\n');
-        }
-
-        await copyText(rawPromptValues);
-        toastr.info(t`Copied!`);
-    });
-
-    popup.dlg.querySelector('#showRawPrompt').addEventListener('click', async function () {
-        //console.log(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
-        console.log(PromptArrayItemForRawPromptDisplay);
-        console.log(itemizedPrompts);
-        console.log(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
-
-        const rawPrompt = flatten(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
-
-        // Mobile needs special handholding. The side-view on the popup wouldn't work,
-        // so we just show an additional popup for this.
-        if (isMobile()) {
-            const content = document.createElement('div');
-            content.classList.add('tokenItemizingMaintext');
-            content.innerText = rawPrompt;
-            const popup = new Popup(content, POPUP_TYPE.TEXT, null, { allowVerticalScrolling: true, leftAlign: true });
-            await popup.show();
-            return;
-        }
-
-        //let DisplayStringifiedPrompt = JSON.stringify(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt).replace(/\n+/g, '<br>');
-        const rawPromptWrapper = document.getElementById('rawPromptWrapper');
-        rawPromptWrapper.innerText = rawPrompt;
-        $('#rawPromptPopup').slideToggle();
-    });
-
-    await popup.show();
 }
 
 function setInContextMessages(msgInContextCount, type) {
@@ -7538,6 +7187,8 @@ export function changeMainAPI() {
         $('#ai_module_block_novel').css('display', 'none');
     }
 
+    $('#prompt_cost_block').toggle(selectedVal === 'textgenerationwebui');
+
     // Hide common settings for OpenAI
     console.debug('value?', selectedVal);
     if (selectedVal == 'openai') {
@@ -7631,47 +7282,12 @@ export async function getSettings() {
         // Allow subscribers to mutate settings
         await eventSource.emit(event_types.SETTINGS_LOADED_BEFORE, settings);
 
-        //Load KoboldAI settings
-        koboldai_setting_names = data.koboldai_setting_names;
-        koboldai_settings = data.koboldai_settings;
-        koboldai_settings.forEach(function (item, i, arr) {
-            koboldai_settings[i] = JSON.parse(item);
-        });
-
-        let arr_holder = {};
-
-        $('#settings_preset').empty();
-        $('#settings_preset').append(
-            '<option value="gui">GUI KoboldAI Settings</option>',
-        ); //adding in the GUI settings, since it is not loaded dynamically
-
-        koboldai_setting_names.forEach(function (item, i, arr) {
-            arr_holder[item] = i;
-            $('#settings_preset').append(`<option value=${i}>${item}</option>`);
-            //console.log('loading preset #'+i+' -- '+item);
-        });
-        koboldai_setting_names = {};
-        koboldai_setting_names = arr_holder;
-        preset_settings = settings.preset_settings;
-
-        if (preset_settings == 'gui') {
-            selectKoboldGuiPreset();
-        } else {
-            if (typeof koboldai_setting_names[preset_settings] !== 'undefined') {
-                $(`#settings_preset option[value=${koboldai_setting_names[preset_settings]}]`)
-                    .attr('selected', 'true');
-            } else {
-                preset_settings = 'gui';
-                selectKoboldGuiPreset();
-            }
-        }
-
         novelai_setting_names = data.novelai_setting_names;
         novelai_settings = data.novelai_settings;
         novelai_settings.forEach(function (item, i, arr) {
             novelai_settings[i] = JSON.parse(item);
         });
-        arr_holder = {};
+        const arr_holder = {};
 
         $('#settings_preset_novel').empty();
 
@@ -7683,7 +7299,6 @@ export async function getSettings() {
         novelai_setting_names = arr_holder;
 
         //Load AI model config settings
-
         amount_gen = settings.amount_gen;
         if (settings.max_context !== undefined)
             max_context = parseInt(settings.max_context);
@@ -7694,7 +7309,7 @@ export async function getSettings() {
         showSwipeButtons();
 
         // Kobold
-        loadKoboldSettings(settings.kai_settings ?? settings);
+        loadKoboldSettings(data, settings.kai_settings ?? settings, settings);
 
         // Novel
         loadNovelSettings(settings.nai_settings ?? settings);
@@ -7702,7 +7317,6 @@ export async function getSettings() {
 
         // TextGen
         loadTextGenSettings(data, settings);
-
 
         // OpenAI
         loadOpenAISettings(data, settings.oai_settings ?? settings);
@@ -7746,12 +7360,8 @@ export async function getSettings() {
 
         main_api = settings.main_api;
         $('#main_api').val(main_api);
-        $('#main_api option[value=' + main_api + ']').attr(
-            'selected',
-            'true',
-        );
+        $(`#main_api option[value=${main_api}]`).attr('selected', 'true');
         changeMainAPI();
-
 
         //Load User's Name and Avatar
         initUserAvatar(settings.user_avatar);
@@ -7760,10 +7370,6 @@ export async function getSettings() {
         //Load the active character and group
         active_character = settings.active_character;
         active_group = settings.active_group;
-
-        //Load the API server URL from settings
-        api_server = settings.api_server;
-        $('#api_url_text').val(api_server);
 
         setWorldInfoSettings(settings.world_info_settings ?? settings, data);
 
@@ -7787,12 +7393,6 @@ export async function getSettings() {
     await validateDisabledSamplers();
     settingsReady = true;
     await eventSource.emit(event_types.SETTINGS_LOADED);
-}
-
-function selectKoboldGuiPreset() {
-    $('#settings_preset option[value=gui]')
-        .attr('selected', 'true')
-        .trigger('change');
 }
 
 //MARK: saveSettings()
@@ -7825,8 +7425,6 @@ export async function saveSettings(loopCounter = 0) {
             username: name1,
             active_character: active_character,
             active_group: active_group,
-            api_server: api_server,
-            preset_settings: preset_settings,
             user_avatar: user_avatar,
             amount_gen: amount_gen,
             max_context: max_context,
@@ -8911,7 +8509,7 @@ export function setGenerationProgress(progress) {
 }
 
 function isHordeGenerationNotAllowed() {
-    if (main_api == 'koboldhorde' && preset_settings == 'gui') {
+    if (main_api == 'koboldhorde' && kai_settings.preset_settings == 'gui') {
         toastr.error(t`GUI Settings preset is not supported for Horde. Please select another preset.`);
         return true;
     }
@@ -8930,19 +8528,25 @@ function updateAlternateGreetingsHintVisibility(root) {
     $(root).find('.alternate_grettings_hint').toggle(numberOfGreetings == 0);
 }
 
-function openCharacterWorldPopup() {
+async function openCharacterWorldPopup() {
     const chid = $('#set_character_world').data('chid');
-
     if (menu_type != 'create' && chid === undefined) {
         toastr.error('Does not have an Id for this character in world select menu.');
         return;
     }
 
-    async function onSelectCharacterWorld() {
-        const value = $('.character_world_info_selector').find('option:selected').val();
-        const worldIndex = value !== '' ? Number(value) : NaN;
-        const name = !isNaN(worldIndex) ? world_names[worldIndex] : '';
+    // TODO: Maybe make this utility function not use the window context?
+    const fileName = getCharaFilename(chid);
+    const charName = (menu_type == 'create' ? create_save.name : characters[chid]?.data?.name) || 'Nameless';
+    const worldId = (menu_type == 'create' ? create_save.world : characters[chid]?.data?.extensions?.world) || '';
+    const template = $('#character_world_template .character_world').clone();
+    template.find('.character_name').text(charName);
 
+    // --- Event Handlers ---
+    async function handlePrimaryWorldSelect() {
+        const selectedValue = $(this).val();
+        const worldIndex = selectedValue !== '' ? Number(selectedValue) : NaN;
+        const name = !isNaN(worldIndex) ? world_names[worldIndex] : '';
         const previousValue = $('#character_world').val();
         $('#character_world').val(name);
 
@@ -8970,26 +8574,26 @@ function openCharacterWorldPopup() {
             await createOrEditCharacter();
         }
 
-        setWorldInfoButtonClass(undefined, !!value);
+        setWorldInfoButtonClass(undefined, !!name);
     }
 
-    function onExtraWorldInfoChanged() {
-        const selectorFieldValue = $('.character_extra_world_info_selector').val();
-        const selectedWorlds = Array.isArray(selectorFieldValue) ? selectorFieldValue : [];
+    function handleExtrasWorldSelect() {
+        const selectedValues = $(this).val();
+        const selectedWorlds = Array.isArray(selectedValues) ? selectedValues : [];
         let charLore = world_info.charLore ?? [];
-
-        // TODO: Maybe make this utility function not use the window context?
-        const fileName = getCharaFilename(chid);
-        const tempExtraBooks = selectedWorlds.map((index) => world_names[index]).filter((e) => e !== undefined);
-
+        const tempExtraBooks = selectedWorlds.map((index) => world_names[index]).filter(Boolean);
         const existingCharIndex = charLore.findIndex((e) => e.name === fileName);
-        if (existingCharIndex === -1) {
-            const newCharLoreEntry = {
-                name: fileName,
-                extraBooks: tempExtraBooks,
-            };
 
-            charLore.push(newCharLoreEntry);
+        if (menu_type == 'create') {
+            create_save.extra_books = tempExtraBooks;
+            return;
+        }
+
+        if (existingCharIndex === -1) {
+            // Add record only if at least 1 lorebook is selected.
+            if (tempExtraBooks.length > 0) {
+                charLore.push({ name: fileName, extraBooks: tempExtraBooks });
+            }
         } else if (tempExtraBooks.length === 0) {
             charLore.splice(existingCharIndex, 1);
         } else {
@@ -9000,62 +8604,43 @@ function openCharacterWorldPopup() {
         saveSettingsDebounced();
     }
 
-    const template = $('#character_world_template .character_world').clone();
-    const select = template.find('.character_world_info_selector');
-    const extraSelect = template.find('.character_extra_world_info_selector');
-    const name = (menu_type == 'create' ? create_save.name : characters[chid]?.data?.name) || 'Nameless';
-    const worldId = (menu_type == 'create' ? create_save.world : characters[chid]?.data?.extensions?.world) || '';
-    template.find('.character_name').text(name);
-
-    // Not needed on mobile
-    if (!isMobile()) {
-        $(extraSelect).select2({
-            width: '100%',
-            placeholder: t`No auxillary Lorebooks set. Click here to select.`,
-            allowClear: true,
-            closeOnSelect: false,
-        });
-    }
-
-    // Apped to base dropdown
+    // --- Populate Dropdowns ---
+    // Append to primary dropdown.
+    const primarySelect = template.find('.character_world_info_selector');
     world_names.forEach((item, i) => {
-        const option = document.createElement('option');
-        option.value = String(i);
-        option.innerText = item;
-        option.selected = item === worldId;
-        select.append(option);
+        primarySelect.append(new Option(item, String(i), item === worldId, item === worldId));
     });
 
-    // Append to extras dropdown
-    if (world_names.length > 0) {
-        extraSelect.empty();
-    }
+    // Append to extras dropdown.
+    const extrasSelect = template.find('.character_extra_world_info_selector');
+    const existingCharLore = world_info.charLore?.find((e) => e.name === fileName);
     world_names.forEach((item, i) => {
-        const option = document.createElement('option');
-        option.value = String(i);
-        option.innerText = item;
-
-        const existingCharLore = world_info.charLore?.find((e) => e.name === getCharaFilename());
-        if (existingCharLore) {
-            option.selected = existingCharLore.extraBooks.includes(item);
-        } else {
-            option.selected = false;
-        }
-        extraSelect.append(option);
+        const array = (menu_type == 'create' ? create_save.extra_books : existingCharLore?.extraBooks);
+        const isSelected = !!array?.includes(item);
+        extrasSelect.append(new Option(item, String(i), isSelected, isSelected));
     });
 
-    select.on('change', onSelectCharacterWorld);
-    extraSelect.on('mousedown change', async function (e) {
-        // If there's no world names, don't do anything
-        if (world_names.length === 0) {
-            e.preventDefault();
-            return;
-        }
+    const popup = new Popup(template, POPUP_TYPE.TEXT, '', {
+        onOpen: function (popup) {
+            const popupDialog = $(popup.dlg);
 
-        onExtraWorldInfoChanged();
+            primarySelect.on('change', handlePrimaryWorldSelect);
+            extrasSelect.on('change', handleExtrasWorldSelect);
+
+            // Not needed on mobile.
+            if (!isMobile()) {
+                extrasSelect.select2({
+                    width: '100%',
+                    placeholder: t`No auxiliary Lorebooks set. Click here to select.`,
+                    allowClear: true,
+                    closeOnSelect: false,
+                    dropdownParent: popupDialog,
+                });
+            }
+        },
     });
 
-    callPopup(template, 'text');
+    await popup.show();
 }
 
 function openAlternateGreetings() {
@@ -9217,6 +8802,15 @@ async function createOrEditCharacter(e) {
                 $(field.id).val(fieldValue);
                 field.callback && field.callback(fieldValue);
             });
+
+            if (Array.isArray(create_save.extra_books) && create_save.extra_books.length > 0) {
+                const fileName = getCharaFilename(null, { manualAvatarKey: avatarId });
+                const charLore = world_info.charLore ?? [];
+                charLore.push({ name: fileName, extraBooks: create_save.extra_books });
+                Object.assign(world_info, { charLore: charLore });
+                saveSettingsDebounced();
+            }
+            create_save.extra_books = [];
 
             $('#character_popup-button-h3').text('Create character');
 
@@ -10089,12 +9683,32 @@ export async function doNewChat({ deleteCurrentChat = false } = {}) {
 }
 
 async function doDeleteChat() {
-    await displayPastChats();
-    let currentChatDeleteButton = $('.select_chat_block[highlight=\'true\']').parent().find('.PastChat_cross');
-    $(currentChatDeleteButton).trigger('click');
-    await delay(1);
-    $('#dialogue_popup_ok').trigger('click', { fromSlashCommand: true });
-    return '';
+    return displayPastChats().then(() => new Promise((resolve) => {
+        let resolved = false;
+        const timeOutId = setTimeout(() => {
+            toastr.error(t`Chat deletion timed out. Please try again.`);
+            setResolved();
+        }, 5000);
+
+        const setResolved = () => {
+            if (resolved) {
+                return;
+            }
+            resolved = true;
+            [event_types.CHAT_DELETED, event_types.GROUP_CHAT_DELETED].forEach((eventType) => {
+                eventSource.removeListener(eventType, setResolved);
+            });
+            clearTimeout(timeOutId);
+            resolve('');
+        };
+
+        [event_types.CHAT_DELETED, event_types.GROUP_CHAT_DELETED].forEach((eventType) => {
+            eventSource.on(eventType, setResolved);
+        });
+
+        const currentChatDeleteButton = $('.select_chat_block[highlight=\'true\']').parent().find('.PastChat_cross');
+        $(currentChatDeleteButton).trigger('click', { fromSlashCommand: true });
+    }));
 }
 
 async function doRenameChat(_, chatName) {
@@ -10457,15 +10071,6 @@ function addDebugFunctions() {
         const message = await generateRaw(text, null, false, false);
         alert(message);
     });
-
-    registerDebugFunction('clearPrompts', 'Delete itemized prompts', 'Deletes all itemized prompts from the local storage.', async () => {
-        await clearItemizedPrompts();
-        toastr.info('Itemized prompts deleted.');
-        if (getCurrentChatId()) {
-            await reloadCurrentChat();
-        }
-    });
-
     registerDebugFunction('toggleEventTracing', 'Toggle event tracing', 'Useful to see what triggered a certain event.', () => {
         localStorage.setItem('eventTracing', localStorage.getItem('eventTracing') === 'true' ? 'false' : 'true');
         toastr.info('Event tracing is now ' + (localStorage.getItem('eventTracing') === 'true' ? 'enabled' : 'disabled'));
@@ -10764,10 +10369,10 @@ jQuery(async function () {
     });
     $('#send_but, #option_regenerate, #option_continue, #mes_continue, #mes_impersonate').on('click', () => {
         if (S_TAPreviouslyFocused) {
-            $('#send_textarea').focus();
+            $('#send_textarea').trigger('focus');
         }
     });
-    $(document).click(event => {
+    $(document).on('click', event => {
         if ($(':focus').attr('id') !== 'send_textarea') {
             var validIDs = ['options_button', 'send_but', 'mes_impersonate', 'mes_continue', 'send_textarea', 'option_regenerate', 'option_continue'];
             if (!validIDs.includes($(event.target).attr('id'))) {
@@ -10780,7 +10385,7 @@ jQuery(async function () {
 
     /////////////////
 
-    $('#swipes-checkbox').change(function () {
+    $('#swipes-checkbox').on('change', function () {
         swipes = !!$('#swipes-checkbox').prop('checked');
         if (swipes) {
             //console.log('toggle change calling showswipebtns');
@@ -10923,11 +10528,51 @@ jQuery(async function () {
         }
     });
 
-    $(document).on('click', '.PastChat_cross', function (e) {
+    /**
+     * Handles the deletion of a chat file, including group chats.
+     *
+     * @param {string} chatFile - The name of the chat file to delete.
+     * @param {object} group - The group object if the chat is part of a group.
+     * @param {boolean} [fromSlashCommand=false] - Whether the deletion was triggered from a slash command.
+     * @returns {Promise<void>}
+     */
+    async function handleDeleteChat(chatFile, group, fromSlashCommand = false) {
+        // Close past chat popup.
+        $('#select_chat_cross').trigger('click');
+        showLoader();
+        if (group) {
+            await deleteGroupChat(group, chatFile);
+        } else {
+            await delChat(chatFile);
+        }
+
+        if (fromSlashCommand) {  // When called from `/delchat` command, don't re-open the history view.
+            $('#options').hide();  // Hide option popup menu.
+            hideLoader();
+        } else {  // Open the history view again after 2 seconds (delay to avoid edge cases for deleting last chat).
+            setTimeout(function () {
+                $('#option_select_chat').trigger('click');
+                $('#options').hide();  // Hide option popup menu.
+                hideLoader();
+            }, 2000);
+        }
+    }
+
+    $(document).on('click', '.PastChat_cross', async function (e, { fromSlashCommand = false } = {}) {
         e.stopPropagation();
         chat_file_for_del = $(this).attr('file_name');
         console.debug('detected cross click for' + chat_file_for_del);
-        callPopup('<h3>' + t`Delete the Chat File?` + '</h3>', 'del_chat');
+
+        // Skip confirmation if called from a slash command.
+        if (fromSlashCommand) {
+            await handleDeleteChat(chat_file_for_del, selected_group, true);
+            return;
+        }
+
+        const result = await callGenericPopup('<h3>' + t`Delete the Chat File?` + '</h3>', POPUP_TYPE.CONFIRM);
+        if (result === POPUP_RESULT.AFFIRMATIVE) {
+            await handleDeleteChat(chat_file_for_del, selected_group, false);
+        }
     });
 
     $('#advanced_div').on('click', function () {
@@ -10976,25 +10621,7 @@ jQuery(async function () {
         }, animation_duration);
 
         if (popup_type == 'del_chat') {
-            //close past chat popup
-            $('#select_chat_cross').trigger('click');
-            showLoader();
-            if (selected_group) {
-                await deleteGroupChat(selected_group, chat_file_for_del);
-            } else {
-                await delChat(chat_file_for_del);
-            }
-
-            if (fromSlashCommand) {  // When called from `/delchat` command, don't re-open the history view.
-                $('#options').hide();  // hide option popup menu
-                hideLoader();
-            } else {  // Open the history view again after 2 seconds (delay to avoid edge cases for deleting last chat).
-                setTimeout(function () {
-                    $('#option_select_chat').trigger('click');
-                    $('#options').hide();  // hide option popup menu
-                    hideLoader();
-                }, 2000);
-            }
+            await handleDeleteChat(chat_file_for_del, selected_group, fromSlashCommand);
         }
 
         if (dialogueResolve) {
@@ -11163,27 +10790,6 @@ jQuery(async function () {
             console.log(`An error has occurred: ${error.message}`);
             await delay(250);
             toastr.error(`Error: ${error.message}`);
-        }
-    });
-
-    ///////////////////////////////////////////////////////////////////////////////////
-
-    $('#api_button').on('click', function (e) {
-        if ($('#api_url_text').val() != '') {
-            let value = formatKoboldUrl(String($('#api_url_text').val()).trim());
-
-            if (!value) {
-                toastr.error('Please enter a valid URL.');
-                return;
-            }
-
-            $('#api_url_text').val(value);
-            api_server = value;
-            startStatusLoading();
-
-            main_api = 'kobold';
-            saveSettingsDebounced();
-            getStatusKobold();
         }
     });
 
@@ -11457,32 +11063,7 @@ jQuery(async function () {
         is_delete_mode = false;
     });
 
-    $('#settings_preset').change(function () {
-        if ($('#settings_preset').find(':selected').val() != 'gui') {
-            preset_settings = $('#settings_preset').find(':selected').text();
-            const preset = koboldai_settings[koboldai_setting_names[preset_settings]];
-            loadKoboldSettings(preset);
-            setGenerationParamsFromPreset(preset);
-            $('#kobold_api-settings').find('input').prop('disabled', false);
-            $('#kobold_api-settings').css('opacity', 1.0);
-            $('#kobold_order')
-                .css('opacity', 1)
-                .sortable('enable');
-        } else {
-            //$('.button').disableSelection();
-            preset_settings = 'gui';
-
-            $('#kobold_api-settings').find('input').prop('disabled', true);
-            $('#kobold_api-settings').css('opacity', 0.5);
-
-            $('#kobold_order')
-                .css('opacity', 0.5)
-                .sortable('disable');
-        }
-        saveSettingsDebounced();
-    });
-
-    $('#settings_preset_novel').change(function () {
+    $('#settings_preset_novel').on('change', function () {
         nai_settings.preset_settings_novel = $('#settings_preset_novel')
             .find(':selected')
             .text();
@@ -11495,7 +11076,7 @@ jQuery(async function () {
         saveSettingsDebounced();
     });
 
-    $('#main_api').change(function () {
+    $('#main_api').on('change', function () {
         cancelStatusCheck('Canceled because main api changed');
         changeMainAPI();
         saveSettingsDebounced();
@@ -11572,14 +11153,6 @@ jQuery(async function () {
             } catch (err) {
                 console.error('Failed to copy: ', err);
             }
-        }
-    });
-
-    $(document).on('pointerup', '.mes_prompt', async function () {
-        let mesIdForItemization = $(this).closest('.mes').attr('mesId');
-        console.log(`looking for mesID: ${mesIdForItemization}`);
-        if (itemizedPrompts.length !== undefined && itemizedPrompts.length !== 0) {
-            await promptItemize(itemizedPrompts, mesIdForItemization);
         }
     });
 
@@ -12023,7 +11596,7 @@ jQuery(async function () {
         select_rm_characters();
     });
 
-    $('#dupe_button').click(async function () {
+    $('#dupe_button').on('click', async function () {
         await duplicateCharacter();
     });
 
@@ -12223,18 +11796,18 @@ jQuery(async function () {
         }
     });
 
-    $(document).keyup(function (e) {
+    $(document).on('keyup', function (e) {
         if (e.key === 'Escape') {
             const isEditVisible = $('#curEditTextarea').is(':visible') || $('.reasoning_edit_textarea').length > 0;
             if (isEditVisible && power_user.auto_save_msg_edits === false) {
                 closeMessageEditor('all');
-                $('#send_textarea').focus();
+                $('#send_textarea').trigger('focus');
                 return;
             }
             if (isEditVisible && power_user.auto_save_msg_edits === true) {
                 $(`#chat .mes[mesid="${this_edit_mes_id}"] .mes_edit_done`).trigger('click');
                 closeMessageEditor('reasoning');
-                $('#send_textarea').focus();
+                $('#send_textarea').trigger('focus');
                 return;
             }
             if (!this_edit_mes_id && $('#mes_stop').is(':visible')) {
@@ -12251,13 +11824,13 @@ jQuery(async function () {
         const target = $(targetElement.selectedOptions).attr('id');
         switch (target) {
             case 'set_character_world':
-                openCharacterWorldPopup();
+                await openCharacterWorldPopup();
                 break;
             case 'set_chat_scenario':
                 await setScenarioOverride();
                 break;
             case 'renameCharButton':
-                renameCharacter();
+                await renameCharacter();
                 break;
             case 'import_character_info':
                 await importEmbeddedWorldInfo();
@@ -12335,6 +11908,9 @@ jQuery(async function () {
     });
 
     $(document).on('change', '.range-block-counter input, .neo-range-input', function (e) {
+        if (!(e.target instanceof HTMLElement)) {
+            return;
+        }
         e.target.focus();
         e.target.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
     });
@@ -12355,7 +11931,6 @@ jQuery(async function () {
                 } else {
                     //if value not ok, warn and reset to last known valid value
                     toastr.warning(`Invalid value. Must be between ${$(this).attr('min')} and ${$(this).attr('max')}`);
-                    console.log(valueBeforeManualInput);
                     //newSlider.val(valueBeforeManualInput)
                     $(this).val(valueBeforeManualInput);
                 }
@@ -12365,7 +11940,6 @@ jQuery(async function () {
 
     $(document).on('keyup', '.range-block-counter input, .neo-range-input', function () {
         valueBeforeManualInput = $(this).val();
-        console.log(valueBeforeManualInput);
         isManualInput = true;
     });
 
@@ -12383,7 +11957,6 @@ jQuery(async function () {
             } else {
                 //if value not ok, warn and reset to last known valid value
                 toastr.warning(`Invalid value. Must be between ${$(this).attr('min')} and ${$(this).attr('max')}`);
-                console.log(valueBeforeManualInput);
                 $(this).val(valueBeforeManualInput);
             }
         }
@@ -12477,13 +12050,6 @@ jQuery(async function () {
 
     // Added here to prevent execution before script.js is loaded and get rid of quirky timeouts
     await firstLoadInit();
-
-    eventSource.on(event_types.CHAT_DELETED, async (name) => {
-        await deleteItemizedPrompts(name);
-    });
-    eventSource.on(event_types.GROUP_CHAT_DELETED, async (name) => {
-        await deleteItemizedPrompts(name);
-    });
 
     window.addEventListener('beforeunload', (e) => {
         if (isChatSaving) {
