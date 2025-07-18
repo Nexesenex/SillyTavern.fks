@@ -3540,7 +3540,6 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         'impersonate',
         'quiet',
         'continue',
-        'ask_command',
     ];
     //for normal messages sent from user..
     if ((textareaText != '' || (hasPendingFileAttachment() && !noAttachTypes.includes(type))) && !automatic_trigger && type !== 'quiet' && !dryRun) {
@@ -4380,7 +4379,6 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 cyclePrompt: cyclePrompt,
                 systemPromptOverride: system,
                 jailbreakPromptOverride: jailbreak,
-                personaDescription: persona,
                 messages: oaiMessages,
                 messageExamples: oaiMessageExamples,
             }, dryRun);
@@ -9369,6 +9367,38 @@ API Settings: ${JSON.stringify(getSettingsContents[getSettingsContents.main_api 
     });
 }
 
+function initCharacterSearch() {
+    const debouncedCharacterSearch = debounce((searchQuery) => {
+        entitiesFilter.setFilterData(FILTER_TYPES.SEARCH, searchQuery);
+    });
+
+    const searchForm = $('#form_character_search_form');
+    const searchInput = $('#character_search_bar');
+    const searchButton = $('#rm_button_search');
+
+    const storageKey = 'characterSearchFormVisible';
+
+    searchInput.on('input', function () {
+        const searchQuery = String($(this).val());
+        debouncedCharacterSearch(searchQuery);
+    });
+
+    searchButton.on('click', function () {
+        const newVisibility = !searchForm.is(':visible');
+        searchForm.toggle(newVisibility);
+        searchButton.toggleClass('active', newVisibility);
+        accountStorage.setItem(storageKey, String(newVisibility));
+        if (newVisibility) {
+            searchInput.trigger('focus');
+        }
+    });
+
+    eventSource.on(event_types.APP_READY, () => {
+        const isVisible = accountStorage.getItem(storageKey) === 'true';
+        searchForm.toggle(isVisible);
+        searchButton.toggleClass('active', isVisible);
+    });
+}
 
 // MARK: DOM Handlers Start
 jQuery(async function () {
@@ -9419,13 +9449,7 @@ jQuery(async function () {
     $(document).on('click', '.last_mes .swipe_right', swipe_right);
     $(document).on('click', '.last_mes .swipe_left', swipe_left);
 
-    const debouncedCharacterSearch = debounce((searchQuery) => {
-        entitiesFilter.setFilterData(FILTER_TYPES.SEARCH, searchQuery);
-    });
-    $('#character_search_bar').on('input', function () {
-        const searchQuery = String($(this).val());
-        debouncedCharacterSearch(searchQuery);
-    });
+    initCharacterSearch();
 
     $('#mes_impersonate').on('click', function () {
         $('#option_impersonate').trigger('click');
