@@ -48,7 +48,6 @@ export const SECRET_KEYS = {
     GROQ: 'api_key_groq',
     AZURE_TTS: 'api_key_azure_tts',
     FEATHERLESS: 'api_key_featherless',
-    ZEROONEAI: 'api_key_01ai',
     HUGGINGFACE: 'api_key_huggingface',
     STABILITY: 'api_key_stability',
     CUSTOM_OPENAI_TTS: 'api_key_custom_openai_tts',
@@ -62,6 +61,8 @@ export const SECRET_KEYS = {
     FALAI: 'api_key_falai',
     XAI: 'api_key_xai',
     VERTEXAI_SERVICE_ACCOUNT: 'vertexai_service_account_json',
+    MINIMAX: 'api_key_minimax',
+    MINIMAX_GROUP_ID: 'minimax_group_id',
 };
 
 const FRIENDLY_NAMES = {
@@ -90,7 +91,6 @@ const FRIENDLY_NAMES = {
     [SECRET_KEYS.PERPLEXITY]: 'Perplexity',
     [SECRET_KEYS.GROQ]: 'Groq',
     [SECRET_KEYS.FEATHERLESS]: 'Featherless',
-    [SECRET_KEYS.ZEROONEAI]: '01.AI',
     [SECRET_KEYS.HUGGINGFACE]: 'HuggingFace',
     [SECRET_KEYS.NANOGPT]: 'NanoGPT',
     [SECRET_KEYS.GENERIC]: 'Generic (OpenAI-compatible)',
@@ -112,6 +112,8 @@ const FRIENDLY_NAMES = {
     [SECRET_KEYS.LINGVA_URL]: 'Lingva Endpoint (e.g. https://lingva.ml/api/v1)',
     [SECRET_KEYS.ONERING_URL]: 'OneRingTranslator Endpoint (e.g. http://127.0.0.1:4990/translate)',
     [SECRET_KEYS.DEEPLX_URL]: 'DeepLX Endpoint (e.g. http://127.0.0.1:1188/translate)',
+    [SECRET_KEYS.MINIMAX]: 'MiniMax TTS',
+    [SECRET_KEYS.MINIMAX_GROUP_ID]: 'MiniMax Group ID',
 };
 
 const INPUT_MAP = {
@@ -139,7 +141,6 @@ const INPUT_MAP = {
     [SECRET_KEYS.PERPLEXITY]: '#api_key_perplexity',
     [SECRET_KEYS.GROQ]: '#api_key_groq',
     [SECRET_KEYS.FEATHERLESS]: '#api_key_featherless',
-    [SECRET_KEYS.ZEROONEAI]: '#api_key_01ai',
     [SECRET_KEYS.HUGGINGFACE]: '#api_key_huggingface',
     [SECRET_KEYS.NANOGPT]: '#api_key_nanogpt',
     [SECRET_KEYS.GENERIC]: '#api_key_generic',
