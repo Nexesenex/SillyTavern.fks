@@ -2688,7 +2688,7 @@ export function parseMesExamples(examplesStr, isInstruct) {
     }
 
     const exampleSeparator = power_user.context.example_separator ? `${substituteParams(power_user.context.example_separator)}\n` : '';
-    const blockHeading = main_api === 'openai' ? '<START>\n' : (exampleSeparator || (isInstruct ? '<START>\n' : ''));
+    const blockHeading = (main_api === 'openai' || isInstruct) ? '<START>\n' : exampleSeparator;
     const splitExamples = examplesStr.split(/<START>/gi).slice(1).map(block => `${blockHeading}${block.trim()}\n`);
 
     return splitExamples;
@@ -5317,28 +5317,33 @@ function parseAndSaveLogprobs(data, continueFrom) {
  * @returns {string} Extracted message
  */
 export function extractMessageFromData(data, activeApi = null) {
-    if (typeof data === 'string') {
-        return data;
-    }
+    function getResult() {
+        if (typeof data === 'string') {
+            return data;
+        }
 
-    switch (activeApi ?? main_api) {
-        case 'kobold':
-            return data.results[0].text;
-        case 'koboldhorde':
-            return data.text;
-        case 'textgenerationwebui':
-            return data.choices?.[0]?.text
+        switch (activeApi ?? main_api) {
+            case 'kobold':
+                return data.results[0].text;
+            case 'koboldhorde':
+                return data.text;
+            case 'textgenerationwebui':
+                return data.choices?.[0]?.text
                 ?? data.choices?.[0]?.message?.content
                 ?? data.content
                 ?? data.response
                 ?? '';
-        case 'novel':
-            return data.output;
-        case 'openai':
-            return data?.content?.find(p => p.type === 'text')?.text ?? data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? data?.text ?? data?.message?.content?.[0]?.text ?? data?.message?.tool_plan ?? '';
-        default:
-            return '';
+            case 'novel':
+                return data.output;
+            case 'openai':
+                return data?.content?.find(p => p.type === 'text')?.text ?? data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? data?.text ?? data?.message?.content?.[0]?.text ?? data?.message?.tool_plan ?? '';
+            default:
+                return '';
+        }
     }
+
+    const result = getResult();
+    return Array.isArray(result) ? result.map(x => x.text).filter(x => x).join('') : result;
 }
 
 /**
