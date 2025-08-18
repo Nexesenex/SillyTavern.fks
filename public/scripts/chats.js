@@ -14,7 +14,6 @@ import {
     name1,
     name2,
     reloadCurrentChat,
-    saveChatDebounced,
     saveSettingsDebounced,
     showSwipeButtons,
     this_chid,
@@ -163,7 +162,7 @@ export async function hideChatMessageRange(start, end, unhide, nameFitler = null
     hideSwipeButtons();
     showSwipeButtons();
 
-    saveChatDebounced();
+    await saveChatConditional();
 }
 
 /**
