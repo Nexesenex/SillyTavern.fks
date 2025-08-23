@@ -67,6 +67,7 @@ const API_AIMLAPI = 'https://api.aimlapi.com/v1';
 const API_POLLINATIONS = 'https://text.pollinations.ai/openai';
 const API_MOONSHOT = 'https://api.moonshot.ai/v1';
 const API_FIREWORKS = 'https://api.fireworks.ai/inference/v1';
+const API_COMETAPI = 'https://api.cometapi.com/v1';
 
 /**
  * Gets OpenRouter transforms based on the request.
@@ -1248,6 +1249,10 @@ router.post('/status', async function (request, statusResponse) {
         apiUrl = API_GROQ;
         apiKey = readSecret(request.user.directories, SECRET_KEYS.GROQ);
         headers = {};
+    } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.COMETAPI) {
+        apiUrl = API_COMETAPI;
+        apiKey = readSecret(request.user.directories, SECRET_KEYS.COMETAPI);
+        headers = {};
     } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.MOONSHOT) {
         apiUrl = API_MOONSHOT;
         apiKey = readSecret(request.user.directories, SECRET_KEYS.MOONSHOT);
@@ -1661,6 +1666,13 @@ router.post('/generate', function (request, response) {
         request.body.json_schema
             ? setJsonObjectFormat(bodyParams, request.body.messages, request.body.json_schema)
             : addAssistantPrefix(request.body.messages, [], 'partial');
+    } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.COMETAPI) {
+        apiUrl = API_COMETAPI;
+        apiKey = readSecret(request.user.directories, SECRET_KEYS.COMETAPI);
+        headers = {};
+        bodyParams = {
+            reasoning_effort: request.body.reasoning_effort,
+        };
     } else {
         console.warn('This chat completion source is not supported yet.');
         return response.status(400).send({ error: true });
@@ -1835,3 +1847,57 @@ router.post('/generate', function (request, response) {
         }
     }
 });
+
+const pollinations = express.Router();
+
+pollinations.post('/models/multimodal', async (_req, res) => {
+    try {
+        const response = await fetch('https://text.pollinations.ai/models');
+
+        if (!response.ok) {
+            return res.json([]);
+        }
+
+        /** @type {any} */
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+            return res.json([]);
+        }
+
+        const multimodalModels = data.filter(m => m?.vision).map(m => m.name);
+        return res.json(multimodalModels);
+    } catch (error) {
+        console.error(error);
+        return res.sendStatus(500);
+    }
+});
+
+router.use('/pollinations', pollinations);
+
+const aimlapi = express.Router();
+
+aimlapi.post('/models/multimodal', async (_req, res) => {
+    try {
+        const response = await fetch('https://api.aimlapi.com/v1/models');
+
+        if (!response.ok) {
+            return res.json([]);
+        }
+
+        /** @type {any} */
+        const data = await response.json();
+
+        if (!Array.isArray(data?.data)) {
+            return res.json([]);
+        }
+
+        const multimodalModels = data.data.filter(m => m?.features?.includes('openai/chat-completion.vision')).map(m => m.id);
+        return res.json(multimodalModels);
+    } catch (error) {
+        console.error(error);
+        return res.sendStatus(500);
+    }
+});
+
+router.use('/aimlapi', aimlapi);
