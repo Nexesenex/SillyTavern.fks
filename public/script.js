@@ -319,6 +319,7 @@ await new Promise((resolve) => {
 
 // Configure toast library:
 toastr.options = {
+    positionClass: 'toast-top-center',
     closeButton: false,
     progressBar: false,
     showDuration: 250,
@@ -810,6 +811,10 @@ export async function selectCharacterById(id, { switchMenu = true } = {}) {
         switchMenu && (selected_button = 'character_edit');
         await unshallowCharacter(this_chid);
         select_selected_character(this_chid, { switchMenu });
+    }
+
+    if (isMobile()) {
+        $('#rightNavDrawerIcon').trigger('click');
     }
 }
 
@@ -6751,7 +6756,7 @@ export function changeMainAPI() {
         $('#ai_module_block_novel').css('display', 'none');
     }
 
-    $('#prompt_cost_block').toggle(selectedVal === 'textgenerationwebui');
+    $('#prompt_cost_block').toggle(selectedVal === 'textgenerationwebui' && textgen_settings.type === textgen_types.OPENROUTER);
 
     // Hide common settings for OpenAI
     console.debug('value?', selectedVal);
