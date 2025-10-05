@@ -2931,6 +2931,10 @@ select option:not(:checked) {
     color: var(--white70a);
 }
 
+select option[disabled]:not(:checked) {
+    color: var(--white30a);
+}
+
 /*#######################################################################*/
 
 #rm_api_block {
@@ -3293,6 +3297,10 @@ input[type=search]:focus::-webkit-search-cancel-button {
     padding-right: 54px;
     margin-top: 3px;
     position: relative;
+}
+
+#rm_group_top_bar:not(:has(#rm_group_activation_strategy option[value="0"]:checked)) label:has(#rm_group_allow_self_responses) {
+    display: none;
 }
 
 .group_member .queue_position:not(:empty)::before {
