@@ -53,10 +53,13 @@ import {
     swipe_right,
     swipe_left,
     generateRaw,
+    showSwipeButtons,
+    hideSwipeButtons,
 } from '../script.js';
 import {
     extension_settings,
     ModuleWorkerWrapper,
+    openThirdPartyExtensionMenu,
     renderExtensionTemplate,
     renderExtensionTemplateAsync,
     saveMetadataDebounced,
@@ -202,7 +205,12 @@ export function getContext() {
         humanizedDateTime,
         updateMessageBlock,
         appendMediaToMessage,
-        swipe: { left: swipe_left, right: swipe_right },
+        swipe: {
+            left: swipe_left,
+            right: swipe_right,
+            show: showSwipeButtons,
+            hide: hideSwipeButtons,
+        },
         variables: {
             local: {
                 get: getLocalVariable,
@@ -233,6 +241,7 @@ export function getContext() {
         parseReasoningFromString,
         unshallowCharacter,
         unshallowGroupMembers,
+        openThirdPartyExtensionMenu,
         symbols: {
             ignore: IGNORE_SYMBOL,
         },
