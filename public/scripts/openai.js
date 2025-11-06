@@ -15,6 +15,8 @@ import {
     Generate,
     getExtensionPrompt,
     getExtensionPromptMaxDepth,
+    getMediaDisplay,
+    getMediaIndex,
     getRequestHeaders,
     getStoppingStrings,
     is_send_press,
@@ -48,11 +50,13 @@ import {
     createThumbnail,
     delay,
     download,
+    getAudioDurationFromDataURL,
     getBase64Async,
     getFileText,
     getImageSizeFromDataURL,
     getSortableDelay,
     getStringHash,
+    getVideoDurationFromDataURL,
     isDataURL,
     isUuid,
     isValidUrl,
@@ -74,7 +78,7 @@ import { callGenericPopup, Popup, POPUP_RESULT, POPUP_TYPE } from './popup.js';
 import { t } from './i18n.js';
 import { ToolManager } from './tool-calling.js';
 import { accountStorage } from './util/AccountStorage.js';
-import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL } from './constants.js';
+import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } from './constants.js';
 
 export {
     openai_messages_count,
@@ -328,6 +332,7 @@ export const settingsToUpdate = {
     image_inlining: ['#openai_image_inlining', 'image_inlining', true, false],
     inline_image_quality: ['#openai_inline_image_quality', 'inline_image_quality', false, false],
     video_inlining: ['#openai_video_inlining', 'video_inlining', true, false],
+    audio_inlining: ['#openai_audio_inlining', 'audio_inlining', true, false],
     continue_prefill: ['#continue_prefill', 'continue_prefill', true, false],
     continue_postfix: ['#continue_postfix', 'continue_postfix', false, false],
     function_calling: ['#openai_function_calling', 'function_calling', true, false],
@@ -423,9 +428,10 @@ const default_settings = {
     vertexai_region: 'us-central1',
     vertexai_express_project_id: '',
     squash_system_messages: false,
-    image_inlining: false,
-    inline_image_quality: 'low',
-    video_inlining: false,
+    image_inlining: true,
+    inline_image_quality: 'auto',
+    video_inlining: true,
+    audio_inlining: true,
     bypass_status_check: false,
     continue_prefill: false,
     function_calling: false,
@@ -539,10 +545,11 @@ function setOpenAIMessages(chat) {
         // Apply the "wrap in quotes" option
         if (role == 'user' && oai_settings.wrap_in_quotes) content = `"${content}"`;
         const name = chat[j]['name'];
-        const image = chat[j]?.extra?.image;
-        const video = chat[j]?.extra?.video;
+        const media = chat[j]?.extra?.media;
+        const mediaDisplay = getMediaDisplay(chat[j]);
+        const mediaIndex = getMediaIndex(chat[j]);
         const invocations = chat[j]?.extra?.tool_invocations;
-        messages[i] = { 'role': role, 'content': content, name: name, 'image': image, 'video': video, 'invocations': invocations };
+        messages[i] = { 'role': role, 'content': content, name: name, 'media': media, 'mediaDisplay': mediaDisplay, 'mediaIndex': mediaIndex, 'invocations': invocations };
         j++;
     }
 
@@ -835,6 +842,7 @@ async function populateChatHistory(messages, prompts, chatCompletion, type = nul
 
     const imageInlining = isImageInliningSupported();
     const videoInlining = isVideoInliningSupported();
+    const audioInlining = isAudioInliningSupported();
     const canUseTools = ToolManager.isToolCallingSupported();
 
     // Insert chat messages as long as there is budget available
@@ -852,12 +860,38 @@ async function populateChatHistory(messages, prompts, chatCompletion, type = nul
             await chatMessage.setName(messageName);
         }
 
-        if (imageInlining && chatPrompt.image) {
-            await chatMessage.addImage(chatPrompt.image);
+        /**
+         * Inline a media attachment into the chat message.
+         * @param {MediaAttachment} media - The media attachment to inline.
+         */
+        async function inlineMediaAttachment(media) {
+            if (!media || !media.url) {
+                return;
+            }
+            if (!media.type) {
+                media.type = MEDIA_TYPE.IMAGE;
+            }
+            if (imageInlining && media.type === MEDIA_TYPE.IMAGE) {
+                await chatMessage.addImage(media.url);
+            }
+            if (videoInlining && media.type === MEDIA_TYPE.VIDEO) {
+                await chatMessage.addVideo(media.url);
+            }
+            if (audioInlining && media.type === MEDIA_TYPE.AUDIO) {
+                await chatMessage.addAudio(media.url);
+            }
         }
 
-        if (videoInlining && chatPrompt.video) {
-            await chatMessage.addVideo(chatPrompt.video);
+        if (Array.isArray(chatPrompt.media) && chatPrompt.media.length) {
+            if (chatPrompt.mediaDisplay === MEDIA_DISPLAY.LIST) {
+                for (const media of chatPrompt.media) {
+                    await inlineMediaAttachment(media);
+                }
+            }
+            if (chatPrompt.mediaDisplay === MEDIA_DISPLAY.GALLERY) {
+                const media = chatPrompt.media[chatPrompt.mediaIndex];
+                await inlineMediaAttachment(media);
+            }
         }
 
         if (canUseTools && Array.isArray(chatPrompt.invocations)) {
@@ -1957,6 +1991,20 @@ function saveModelList(data) {
 
         $('#model_xai_select').val(oai_settings.xai_model).trigger('change');
     }
+
+    if (oai_settings.chat_completion_source == chat_completion_sources.MOONSHOT) {
+        $('#model_moonshot_select').empty();
+        model_list.forEach((model) => {
+            $('#model_moonshot_select').append(new Option(model.id, model.id));
+        });
+
+        const selectedModel = model_list.find(model => model.id === oai_settings.moonshot_model);
+        if (model_list.length > 0 && (!selectedModel || !oai_settings.moonshot_model)) {
+            oai_settings.moonshot_model = model_list[0].id;
+        }
+
+        $('#model_moonshot_select').val(oai_settings.moonshot_model).trigger('change');
+    }
 }
 
 function appendOpenRouterOptions(model_list, groupModels = false, sort = false) {
@@ -2507,7 +2555,7 @@ async function sendOpenAIRequest(type, messages, signal, { jsonSchema = null } =
             let text = '';
             const swipes = [];
             const toolCalls = [];
-            const state = { reasoning: '', image: '' };
+            const state = { reasoning: '', images: [] };
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) return;
@@ -2572,9 +2620,9 @@ export function getStreamingReply(data, state, { chatCompletionSource = null, ov
         }
         return data?.delta?.text || '';
     } else if ([chat_completion_sources.MAKERSUITE, chat_completion_sources.VERTEXAI].includes(chat_completion_source)) {
-        const inlineData = data?.candidates?.[0]?.content?.parts?.find(x => x.inlineData)?.inlineData;
-        if (inlineData) {
-            state.image = `data:${inlineData.mimeType};base64,${inlineData.data}`;
+        const inlineData = data?.candidates?.[0]?.content?.parts?.filter(x => x.inlineData)?.map(x => x.inlineData) || [];
+        if (Array.isArray(inlineData) && inlineData.length > 0) {
+            state.images.push(...inlineData.map(x => `data:${x.mimeType};base64,${x.data}`).filter(isDataURL));
         }
         if (show_thoughts) {
             state.reasoning += (data?.candidates?.[0]?.content?.parts?.filter(x => x.thought)?.map(x => x.text)?.[0] || '');
@@ -2593,9 +2641,9 @@ export function getStreamingReply(data, state, { chatCompletionSource = null, ov
         }
         return data.choices?.[0]?.delta?.content || '';
     } else if (chat_completion_source === chat_completion_sources.OPENROUTER) {
-        const imageUrl = data?.choices?.[0]?.delta?.images?.find(x => x.type === 'image_url')?.image_url?.url;
-        if (imageUrl) {
-            state.image = imageUrl;
+        const imageUrls = data?.choices?.[0]?.delta?.images?.filter(x => x.type === 'image_url')?.map(x => x?.image_url?.url) || [];
+        if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+            state.images.push(...imageUrls.filter(isDataURL));
         }
         if (show_thoughts) {
             state.reasoning += (data.choices?.filter(x => x?.delta?.reasoning)?.[0]?.delta?.reasoning || '');
@@ -2899,12 +2947,27 @@ class Message {
     }
 
     /**
+     * Ensures the content is an array. If it's a string, converts it to an array with a single text object.
+     * @returns {any[]} Content as an array
+     */
+    ensureContentIsArray() {
+        const textContent = this.content;
+        if (!Array.isArray(this.content)) {
+            this.content = [];
+            if (typeof textContent === 'string') {
+                this.content.push({ type: 'text', text: textContent });
+            }
+        }
+        return this.content;
+    }
+
+    /**
      * Adds an image to the message.
      * @param {string} image Image URL or Data URL.
      * @returns {Promise<void>}
      */
     async addImage(image) {
-        const textContent = this.content;
+        this.content = this.ensureContentIsArray();
         const isDataUrl = isDataURL(image);
         if (!isDataUrl) {
             try {
@@ -2921,10 +2984,7 @@ class Message {
         image = await this.compressImage(image);
 
         const quality = oai_settings.inline_image_quality || default_settings.inline_image_quality;
-        this.content = [
-            { type: 'text', text: textContent },
-            { type: 'image_url', image_url: { 'url': image, 'detail': quality } },
-        ];
+        this.content.push({ type: 'image_url', image_url: { 'url': image, 'detail': quality } });
 
         try {
             const tokens = await this.getImageTokenCost(image, quality);
@@ -2935,8 +2995,13 @@ class Message {
         }
     }
 
+    /**
+     * Adds a video to the message.
+     * @param {string} video Video URL or Data URL.
+     * @returns {Promise<void>}
+     */
     async addVideo(video) {
-        const textContent = this.content;
+        this.content = this.ensureContentIsArray();
         const isDataUrl = isDataURL(video);
         if (!isDataUrl) {
             try {
@@ -2951,19 +3016,50 @@ class Message {
         }
 
         // Note: No compression for videos (unlike images)
-        this.content = [
-            { type: 'text', text: textContent },
-            { type: 'video_url', video_url: { 'url': video } },
-        ];
+        this.content.push({ type: 'video_url', video_url: { 'url': video } });
 
         try {
-            // Convservative estimate for video token cost without knowing duration
             // Using Gemini calculation (263 tokens per second)
-            const tokens = 10000; // ~40 second video (60 seconds max)
-            this.tokens += tokens;
+            const duration = await getVideoDurationFromDataURL(video);
+            this.tokens += 263 * Math.ceil(duration);
         } catch (error) {
-            this.tokens += 10000;
+            // Convservative estimate for video token cost without knowing duration
+            this.tokens += 263 * 40; // ~40 second video (60 seconds max)
             console.error('Failed to get video token cost', error);
+        }
+    }
+
+    /**
+     * Adds a audio to the message.
+     * @param {string} audio Audio URL or Data URL.
+     * @returns {Promise<void>}
+     */
+    async addAudio(audio) {
+        this.content = this.ensureContentIsArray();
+        const isDataUrl = isDataURL(audio);
+        if (!isDataUrl) {
+            try {
+                const response = await fetch(audio, { method: 'GET', cache: 'force-cache' });
+                if (!response.ok) throw new Error('Failed to fetch audio');
+                const blob = await response.blob();
+                audio = await getBase64Async(blob);
+            } catch (error) {
+                console.error('Audio adding skipped', error);
+                return;
+            }
+        }
+
+        this.content.push({ type: 'audio_url', audio_url: { 'url': audio } });
+
+        try {
+            // Using Gemini calculation (32 tokens per second)
+            const duration = await getAudioDurationFromDataURL(audio);
+            this.tokens += 32 * Math.ceil(duration);
+        } catch (error) {
+            // Estimate for audio token cost without knowing duration
+            const tokens = 32 * 300; // ~5 minute audio
+            this.tokens += tokens;
+            console.error('Failed to get audio token cost', error);
         }
     }
 
@@ -3596,6 +3692,7 @@ function loadOpenAISettings(data, settings) {
     oai_settings.image_inlining = settings.image_inlining ?? default_settings.image_inlining;
     oai_settings.inline_image_quality = settings.inline_image_quality ?? default_settings.inline_image_quality;
     oai_settings.video_inlining = settings.video_inlining ?? default_settings.video_inlining;
+    oai_settings.audio_inlining = settings.audio_inlining ?? default_settings.audio_inlining;
     oai_settings.bypass_status_check = settings.bypass_status_check ?? default_settings.bypass_status_check;
     oai_settings.vertexai_express_project_id = settings.vertexai_express_project_id ?? default_settings.vertexai_express_project_id;
     oai_settings.show_thoughts = settings.show_thoughts ?? default_settings.show_thoughts;
@@ -3648,6 +3745,7 @@ function loadOpenAISettings(data, settings) {
     $(`#openai_inline_image_quality option[value="${oai_settings.inline_image_quality}"]`).prop('selected', true);
 
     $('#openai_video_inlining').prop('checked', oai_settings.video_inlining);
+    $('#openai_audio_inlining').prop('checked', oai_settings.audio_inlining);
 
     $('#model_openai_select').val(oai_settings.openai_model);
     $(`#model_openai_select option[value="${oai_settings.openai_model}"`).prop('selected', true);
@@ -4040,6 +4138,7 @@ async function saveOpenAIPreset(name, settings, triggerUi = true) {
         image_inlining: settings.image_inlining,
         inline_image_quality: settings.inline_image_quality,
         video_inlining: settings.video_inlining,
+        audio_inlining: settings.audio_inlining,
         bypass_status_check: settings.bypass_status_check,
         continue_prefill: settings.continue_prefill,
         continue_postfix: settings.continue_postfix,
@@ -4661,9 +4760,22 @@ function getZaiMaxContext(model, isUnlocked) {
     return Object.entries(contextMap).find(([key]) => model.includes(key))?.[1] || max_128k;
 }
 
+/**
+ * Get the maximum context size for the Moonshot model
+ * @param {string} model Model identifier
+ * @param {boolean} isUnlocked If context limits are unlocked
+ * @returns {number} Maximum context size in tokens
+ */
 function getMoonshotMaxContext(model, isUnlocked) {
     if (isUnlocked) {
         return unlocked_max;
+    }
+
+    if (Array.isArray(model_list) && model_list.length > 0) {
+        const modelInfo = model_list.find((record) => record.id === model);
+        if (modelInfo?.context_length) {
+            return modelInfo.context_length;
+        }
     }
 
     const contextMap = {
@@ -4898,6 +5010,10 @@ async function onModelChange() {
     }
 
     if (value && $(this).is('#model_moonshot_select')) {
+        if (!value) {
+            console.debug('Null Moonshot model selected. Ignoring.');
+            return;
+        }
         console.log('Moonshot model changed to', value);
         oai_settings.moonshot_model = value;
     }
@@ -5605,6 +5721,36 @@ export function isVideoInliningSupported() {
 }
 
 /**
+ * Check if the model supports video inlining
+ * @returns {boolean} True if the model supports audio inlining
+ */
+export function isAudioInliningSupported() {
+    if (main_api !== 'openai') {
+        return false;
+    }
+
+    if (!oai_settings.audio_inlining) {
+        return false;
+    }
+
+    // Only Gemini models support audio for now
+    const audioSupportedModels = [
+        'gemini-2.0',
+        'gemini-2.5',
+        'gemini-exp-1206',
+    ];
+
+    switch (oai_settings.chat_completion_source) {
+        case chat_completion_sources.MAKERSUITE:
+            return audioSupportedModels.some(model => oai_settings.google_model.includes(model));
+        case chat_completion_sources.VERTEXAI:
+            return audioSupportedModels.some(model => oai_settings.vertexai_model.includes(model));
+        default:
+            return false;
+    }
+}
+
+/**
  * Proxy stuff
  */
 export function loadProxyPresets(settings) {
@@ -5866,6 +6012,7 @@ function updateFeatureSupportFlags() {
         openai_function_calling_supported: ToolManager.isToolCallingSupported(),
         openai_image_inlining_supported: isImageInliningSupported(),
         openai_video_inlining_supported: isVideoInliningSupported(),
+        openai_audio_inlining_supported: isAudioInliningSupported(),
     };
 
     for (const [key, value] of Object.entries(featureFlags)) {
@@ -6186,6 +6333,12 @@ export function initOpenAI() {
 
     $('#openai_video_inlining').on('input', function () {
         oai_settings.video_inlining = !!$(this).prop('checked');
+        updateFeatureSupportFlags();
+        saveSettingsDebounced();
+    });
+
+    $('#openai_audio_inlining').on('input', function () {
+        oai_settings.audio_inlining = !!$(this).prop('checked');
         updateFeatureSupportFlags();
         saveSettingsDebounced();
     });
