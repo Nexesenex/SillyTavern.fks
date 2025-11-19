@@ -26,7 +26,7 @@ import { getEventSourceStream } from './sse-stream.js';
 import { getCurrentDreamGenModelTokenizer, getCurrentOpenRouterModelTokenizer, loadAphroditeModels, loadDreamGenModels, loadFeatherlessModels, loadGenericModels, loadInfermaticAIModels, loadMancerModels, loadOllamaModels, loadOpenRouterModels, loadTabbyModels, loadTogetherAIModels, loadVllmModels } from './textgen-models.js';
 import { ENCODE_TOKENIZERS, TEXTGEN_TOKENIZERS, TOKENIZER_SUPPORTED_KEY, getTextTokens, tokenizers } from './tokenizers.js';
 import { AbortReason } from './util/AbortReason.js';
-import { getSortableDelay, onlyUnique, arraysEqual, isObject } from './utils.js';
+import { getSortableDelay, onlyUnique, arraysEqual } from './utils.js';
 
 export const textgen_types = {
     OOBA: 'ooba',
@@ -192,7 +192,7 @@ const settings = {
     guidance_scale: 1,
     negative_prompt: '',
     grammar_string: '',
-    json_schema: null,
+    json_schema: {},
     banned_tokens: '',
     global_banned_tokens: '',
     send_banned_tokens: true,
@@ -857,16 +857,11 @@ export function initTextGenSettings() {
     $('#tabby_json_schema').on('input', function () {
         const json_schema_string = String($(this).val());
 
-        if (json_schema_string) {
-            try {
-                settings.json_schema = JSON.parse(json_schema_string);
-            } catch {
-                settings.json_schema = null;
-            }
-        } else {
-            settings.json_schema = null;
+        try {
+            settings.json_schema = JSON.parse(json_schema_string || '{}');
+        } catch {
+            // Ignore errors from here
         }
-
         saveSettingsDebounced();
     });
 
@@ -1198,8 +1193,8 @@ function setSettingByName(setting, value, trigger) {
     }
 
     if ('json_schema' === setting) {
-        settings.json_schema = value ?? null;
-        $('#tabby_json_schema').val(value ? JSON.stringify(settings.json_schema, null, 2) : '');
+        settings.json_schema = value ?? {};
+        $('#tabby_json_schema').val(JSON.stringify(settings.json_schema, null, 2));
         return;
     }
 
@@ -1601,8 +1596,8 @@ export async function getTextGenGenerationData(finalPrompt, maxTokens, isImperso
         'seed': settings.seed >= 0 ? settings.seed : undefined,
         'guidance_scale': cfgValues?.guidanceScale?.value ?? settings.guidance_scale ?? 1,
         'negative_prompt': cfgValues?.negativePrompt ?? substituteParams(settings.negative_prompt) ?? '',
-        'grammar_string': settings.grammar_string || undefined,
-        'json_schema': [TABBY, LLAMACPP].includes(settings.type) && settings.json_schema ? settings.json_schema : undefined,
+        'grammar_string': settings.grammar_string,
+        'json_schema': [TABBY, LLAMACPP].includes(settings.type) ? settings.json_schema : undefined,
         // llama.cpp aliases. In case someone wants to use LM Studio as Text Completion API
         'repeat_penalty': settings.rep_pen,
         'repeat_last_n': settings.rep_pen_range,
@@ -1643,8 +1638,8 @@ export async function getTextGenGenerationData(finalPrompt, maxTokens, isImperso
         'min_tokens': settings.min_length,
         'skip_special_tokens': settings.skip_special_tokens,
         'spaces_between_special_tokens': settings.spaces_between_special_tokens,
-        'guided_grammar': settings.grammar_string || undefined,
-        'guided_json': settings.json_schema || undefined,
+        'guided_grammar': settings.grammar_string,
+        'guided_json': settings.json_schema,
         'early_stopping': false, // hacks
         'include_stop_str_in_output': false,
         'dynatemp_min': dynatemp ? settings.min_temp : undefined,
@@ -1668,7 +1663,7 @@ export async function getTextGenGenerationData(finalPrompt, maxTokens, isImperso
     }
 
     if (settings.type === KOBOLDCPP) {
-        params.grammar = settings.grammar_string || undefined;
+        params.grammar = settings.grammar_string;
         params.trim_stop = true;
     }
 
@@ -1737,19 +1732,17 @@ export async function getTextGenGenerationData(finalPrompt, maxTokens, isImperso
         }
     }
 
+    await eventSource.emit(event_types.TEXT_COMPLETION_SETTINGS_READY, params);
+
     // Grammar conflicts with with json_schema
-    if ([LLAMACPP, APHRODITE].includes(settings.type)) {
-        if (settings.json_schema && isObject(settings.json_schema)) {
+    if (settings.type === LLAMACPP) {
+        if (params.json_schema && Object.keys(params.json_schema).length > 0) {
             delete params.grammar_string;
             delete params.grammar;
-            delete params.guided_grammar;
         } else {
             delete params.json_schema;
-            delete params.guided_json;
         }
     }
-
-    await eventSource.emit(event_types.TEXT_COMPLETION_SETTINGS_READY, params);
 
     return params;
 }
