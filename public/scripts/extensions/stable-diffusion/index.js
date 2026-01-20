@@ -69,6 +69,12 @@ const MODULE_NAME = 'sd';
 // This is a 1x1 transparent PNG
 const PNG_PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 const CUSTOM_STOP_EVENT = 'sd_stop_generation';
+
+// Generation tracking for status indicator
+let activeGenerations = 0;
+/** @type {JQuery<HTMLElement>|null} */
+let generationToast = null;
+
 const sources = {
     extras: 'extras',
     horde: 'horde',
@@ -979,6 +985,13 @@ const resolutionOptions = {
     sd_res_1024x1536: { width: 1024, height: 1536, name: '1024x1536 (2:3, ChatGPT)' },
     sd_res_1024x1792: { width: 1024, height: 1792, name: '1024x1792 (4:7, DALL-E)' },
     sd_res_1792x1024: { width: 1792, height: 1024, name: '1792x1024 (7:4, DALL-E)' },
+    sd_res_1280x1280: { width: 1280, height: 1280, name: '1280x1280 (1:1, Z.AI)' },
+    sd_res_1568x1056: { width: 1568, height: 1056, name: '1568x1056 (3:2, Z.AI)' },
+    sd_res_1056x1568: { width: 1056, height: 1568, name: '1056x1568 (2:3, Z.AI)' },
+    sd_res_1472x1088: { width: 1472, height: 1088, name: '1472x1088 (4:3, Z.AI)' },
+    sd_res_1088x1472: { width: 1088, height: 1472, name: '1088x1472 (3:4, Z.AI)' },
+    sd_res_1728x960: { width: 1728, height: 960, name: '1728x960 (16:9, Z.AI)' },
+    sd_res_960x1728: { width: 960, height: 1728, name: '960x1728 (9:16, Z.AI)' },
 };
 
 function onResolutionChange() {
@@ -2297,7 +2310,12 @@ async function loadGoogleModels() {
 }
 
 async function loadZaiModels() {
-    return ['cogview-4-250304', 'cogvideox-3', 'viduq1-text'].map(name => ({ value: name, text: name }));
+    return [
+        { value: 'glm-image', text: 'GLM-Image' },
+        { value: 'cogview-4-250304', text: 'CogView-4' },
+        { value: 'cogvideox-3', text: 'CogVideoX-3' },
+        { value: 'viduq1-text', text: 'Viduq1-Text' },
+    ];
 }
 
 async function loadOpenRouterModels() {
@@ -2731,6 +2749,62 @@ function ensureSelectionExists(setting, selector) {
 }
 
 /**
+ * Updates the generation status indicator based on active generation count.
+ * Shows/hides various UI indicators to inform user of background image generation.
+ */
+function updateGenerationIndicator() {
+    if (activeGenerations > 0) {
+        const countText = activeGenerations > 1 ? ` (${activeGenerations})` : '';
+        const toastText = `<i class="fa-solid fa-spinner fa-spin"></i> ${t`Generating image`}${countText}...`;
+
+        // Show persistent toast if not already showing
+        if (!generationToast) {
+            generationToast = toastr.info(
+                toastText,
+                'Image Generation',
+                {
+                    timeOut: 0,
+                    extendedTimeOut: 0,
+                    tapToDismiss: true,
+                    escapeHtml: false,
+                    onHidden: () => {
+                        generationToast = null;
+                    },
+                },
+            );
+        } else if (activeGenerations > 1) {
+            // Update count in existing toast
+            const toastMessage = $(generationToast).find('.toast-message');
+            if (toastMessage.length) {
+                toastMessage.html(toastText);
+            }
+        }
+    } else {
+        // Hide toast when done
+        if (generationToast) {
+            toastr.clear(generationToast);
+            generationToast = null;
+        }
+    }
+}
+
+/**
+ * Increments the active generation counter and updates indicators.
+ */
+function startGenerationTracking() {
+    activeGenerations++;
+    updateGenerationIndicator();
+}
+
+/**
+ * Decrements the active generation counter and updates indicators.
+ */
+function endGenerationTracking() {
+    activeGenerations = Math.max(0, activeGenerations - 1);
+    updateGenerationIndicator();
+}
+
+/**
  * Generates an image based on the given trigger word.
  * @param {string} initiator The initiator of the image generation
  * @param {Record<string, object>} args Command arguments
@@ -2804,6 +2878,9 @@ async function generatePicture(initiator, args, trigger, message, callback) {
         await eventSource.emit(event_types.SD_PROMPT_PROCESSING, eventData);
         prompt = eventData.prompt; // Allow extensions to modify the prompt
 
+        // Track this generation for status indicator
+        startGenerationTracking();
+        // Show stop button after prompt is ready (prompt generation uses separate abort mechanism)
         $(stopButton).show();
         eventSource.once(CUSTOM_STOP_EVENT, stopListener);
 
@@ -2814,6 +2891,13 @@ async function generatePicture(initiator, args, trigger, message, callback) {
         // generate the image
         imagePath = await sendGenerationRequest(generationType, prompt, negativePromptPrefix, characterName, callback, initiator, abortController.signal);
     } catch (err) {
+        // Check if this was an intentional abort by user
+        if (abortController.signal.aborted) {
+            console.log('SD: Image generation aborted by user');
+            toastr.info('Image generation stopped.', 'Image Generation');
+            return;
+        }
+
         console.trace(err);
         // errors here are most likely due to text generation failure
         // sendGenerationRequest mostly deals with its own errors
@@ -2826,6 +2910,7 @@ async function generatePicture(initiator, args, trigger, message, callback) {
         $(stopButton).hide();
         restoreOriginalDimensions(dimensions);
         eventSource.removeListener(CUSTOM_STOP_EVENT, stopListener);
+        endGenerationTracking();
     }
 
     return imagePath;
@@ -3017,8 +3102,10 @@ function getUserAvatarUrl() {
  * @returns {Promise<string>} - A promise that resolves when the prompt generation completes.
  */
 async function generatePrompt(quietPrompt) {
+    const toast = toastr.info('Generating image prompt with an LLM...', 'Image Generation');
     const reply = await generateQuietPrompt({ quietPrompt });
     const processedReply = processReply(reply);
+    toastr.clear(toast);
 
     if (!processedReply) {
         toastr.error('Prompt generation produced no text. Make sure you\'re using a valid instruct template and try again', 'Image Generation');
@@ -3143,6 +3230,13 @@ async function sendGenerationRequest(generationType, prompt, additionalNegativeP
             throw new Error('Endpoint did not return image data.');
         }
     } catch (err) {
+        // Check if this was an intentional abort by user
+        if (signal?.aborted) {
+            console.log('SD: Image generation aborted by user');
+            toastr.info('Image generation stopped.', 'Image Generation');
+            return;
+        }
+
         console.error('Image generation request error: ', err);
         toastr.error('Image generation failed. Please try again.' + '\n\n' + String(err), 'Image Generation');
         return;
@@ -4268,6 +4362,7 @@ async function generateGoogleImage(prompt, negativePrompt, signal) {
  * @returns {Promise<{format: string, data: string}>} A promise that resolves when the image generation and processing are complete.
  */
 async function generateZaiImage(prompt, signal) {
+    // Video generation models (CogVideoX, Viduq1)
     if (/(cogvideox|vidu)/.test(extension_settings.sd.model)) {
         const videoParams = {};
         if (/cogvideox/.test(extension_settings.sd.model)) {
@@ -4298,16 +4393,23 @@ async function generateZaiImage(prompt, signal) {
         const text = await videoResult.text();
         throw new Error(text);
     } else {
-        // Round width and height to nearest multiple of 16, and clamp to 512-2048 range
-        let width = clamp(Math.round(extension_settings.sd.width / 16) * 16, 512, 2048);
-        let height = clamp(Math.round(extension_settings.sd.height / 16) * 16, 512, 2048);
+        // Image generation models (GLM-Image, CogView)
+        // GLM-Image requires multiples of 32, CogView requires multiples of 16
+        const isGlmImage = /glm-image/.test(extension_settings.sd.model);
+        const multiple = isGlmImage ? 32 : 16;
 
-        // Make sure the pixel count does not exceed 2^21px
-        while ((width * height) > Math.pow(2, 21)) {
-            if (width >= height) {
-                width -= 16;
-            } else {
-                height -= 16;
+        // Round width and height to nearest multiple and clamp to 512-2048 range
+        let width = clamp(Math.round(extension_settings.sd.width / multiple) * multiple, 512, 2048);
+        let height = clamp(Math.round(extension_settings.sd.height / multiple) * multiple, 512, 2048);
+
+        // CogView has a 2^21px pixel count limit, GLM-Image does not
+        if (!isGlmImage) {
+            while ((width * height) > Math.pow(2, 21)) {
+                if (width >= height) {
+                    width -= multiple;
+                } else {
+                    height -= multiple;
+                }
             }
         }
 
@@ -4683,7 +4785,8 @@ function isValidState() {
     }
 }
 
-let buttonAbortController = null;
+/** @type {WeakMap<HTMLElement, AbortController>} */
+const buttonAbortControllers = new WeakMap();
 
 /**
  * "Paintbrush" button handler to generate a new image for a message.
@@ -4701,16 +4804,30 @@ async function sdMessageButton($icon, { animate } = {}) {
         $icon.toggleClass(classes.idle, !isBusy);
         $icon.toggleClass(classes.busy, isBusy);
         $media.toggleClass(classes.animation, isBusy);
+
+        // Update generation counter toast
+        const trackingFunction = isBusy ? startGenerationTracking : endGenerationTracking;
+        trackingFunction();
     }
 
     let $media = jQuery();
 
     const classes = { busy: 'fa-hourglass', idle: 'fa-paintbrush', animation: 'fa-fade' };
     const context = getContext();
+    const abortController = (() => {
+        const nativeElement = $icon.get(0);
+        if (buttonAbortControllers.has(nativeElement)) {
+            return buttonAbortControllers.get(nativeElement);
+        } else {
+            const controller = new AbortController();
+            buttonAbortControllers.set(nativeElement, controller);
+            return controller;
+        }
+    })();
 
     if ($icon.hasClass(classes.busy)) {
-        buttonAbortController?.abort('Aborted by user');
-        console.log('Previous image is still being generated...');
+        abortController.abort('Aborted by user');
+        console.log('SD: Image generation aborted by user');
         return;
     }
 
@@ -4747,13 +4864,12 @@ async function sdMessageButton($icon, { animate } = {}) {
         $media = messageElement.find(`.mes_media_container[data-index="${index}"]`).find('.mes_img, .mes_video');
     }
 
-    buttonAbortController = new AbortController();
     const newMediaAttachment = await generateMediaSwipe(
         selectedMedia,
         message,
         () => setBusyIcon(true),
         () => setBusyIcon(false),
-        buttonAbortController,
+        abortController,
     );
 
     if (!newMediaAttachment) {
