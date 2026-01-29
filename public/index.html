@@ -1474,6 +1474,14 @@
                                             </div>
                                             <textarea id="dry_sequence_breakers_textgenerationwebui" class="text_pole textarea_compact" name="sequence_breakers" rows="3" data-i18n="[placeholder]JSON-serialized array of strings." placeholder="JSON-serialized array of strings."></textarea>
                                         </div>
+                                    </div>
+                                    <div data-tg-type="aphrodite, mancer, ooba, koboldcpp, tabby, llamacpp, dreamgen" data-tg-samplers="ik_bans" id="ikBanBlock" class="wide100p">
+                                        <h4 class="wide100p textAlignCenter" title="String and regex bans. Make empty to disable." data-i18n="[title]ik_bans_desc">
+                                            <label data-i18n="ik_Bans">ik_Bans</label>
+                                            <a href="https://github.com/ikawrakow/ik_llama.cpp/pull/1131" target="_blank">
+                                                <div class=" fa-solid fa-circle-info opacity50p"></div>
+                                            </a>
+                                        </h4>
                                         <div data-tg-samplers="ik_banbuffer_size" class="alignItemsCenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0" data-tg-type="llamacpp, koboldcpp, tabby, aphrodite">
                                             <small data-i18n="ik_Banbuffer size">ik_Banbuffer size</small>
                                             <input class="neo-range-slider" type="range" id="ik_banbuffer_size_textgenerationwebui" min="0" max="8192" step="1" />
@@ -1727,7 +1735,8 @@
                                     </div>
                                     <div id="json_schema_block" data-tg-type="tabby, llamacpp, aphrodite" data-tg-samplers="json_schema" class="wide100p">
                                         <hr class="wide100p">
-                                        <h4 class="wide100p textAlignCenter"><span data-i18n="JSON Schema">JSON Schema</span>
+                                        <h4 class="wide100p textAlignCenter">
+                                            <span data-i18n="JSON Schema">JSON Schema</span>
                                             <a href="https://json-schema.org/learn/getting-started-step-by-step" target="_blank">
                                                 <small>
                                                     <div class="fa-solid fa-circle-question note-link-span"></div>
