@@ -68,6 +68,7 @@ const LLAMACPP_DEFAULT_ORDER = [
     'penalties',
     'dry',
     'top_n_sigma',
+    'tfs_z',
     'top_k',
     'typ_p',
     'top_p',
@@ -175,6 +176,10 @@ export const textgenerationwebui_settings = {
     dry_multiplier: 0.0,
     dry_base: 1.75,
     dry_sequence_breakers: '["\\n", ":", "\\"", "*"]',
+    ik_banbuffer_size: 0,
+    ik_banned_strings: [],
+    ik_banned_regex: [],
+    ik_banned_regex_case_insensitive: [],
     dry_penalty_last_n: 0,
     max_tokens_second: 0,
     seed: -1,
@@ -270,6 +275,10 @@ export const setting_names = [
     'dry_multiplier',
     'dry_base',
     'dry_sequence_breakers',
+    'ik_banbuffer_size',
+    'ik_banned_strings',
+    'ik_banned_regex',
+    'ik_banned_regex_case_insensitive',
     'dry_penalty_last_n',
     'max_tokens_second',
     'encoder_rep_pen',
@@ -1601,6 +1610,10 @@ export function createTextGenGenerationData(settings, model, finalPrompt = null,
         'dry_multiplier': settings.dry_multiplier,
         'dry_base': settings.dry_base,
         'dry_sequence_breakers': replaceMacrosInList(settings.dry_sequence_breakers),
+        'ik_banbuffer_size': settings.ik_banbuffer_size,
+        'ik_banned_strings': replaceMacrosInList(settings.ik_banned_strings),
+        'ik_banned_regex': replaceMacrosInList(settings.ik_banned_regex),
+        'ik_banned_regex_case_insensitive': replaceMacrosInList(settings.ik_banned_regex_case_insensitive),
         'dry_penalty_last_n': settings.dry_penalty_last_n,
         'max_tokens_second': settings.max_tokens_second,
         'sampler_priority': settings.type === OOBA ? settings.sampler_priority : undefined,
@@ -1636,6 +1649,36 @@ export function createTextGenGenerationData(settings, model, finalPrompt = null,
             } catch {
                 if (typeof this.dry_sequence_breakers === 'string') {
                     return this.dry_sequence_breakers.split(',');
+                }
+                return undefined;
+            }
+        },
+        parseIkBannedStrings: function () {
+            try {
+                return JSON.parse(this.ik_banned_strings);
+            } catch {
+                if (typeof this.ik_banned_strings === 'string') {
+                    return this.ik_banned_strings.split('\n');
+                }
+                return undefined;
+            }
+        },
+        parseIkBannedRegex: function () {
+            try {
+                return JSON.parse(this.ik_banned_regex);
+            } catch {
+                if (typeof this.ik_banned_regex === 'string') {
+                    return this.ik_banned_regex.split('\n');
+                }
+                return undefined;
+            }
+        },
+        parseIkBannedRegexCaseInsensitive: function () {
+            try {
+                return JSON.parse(this.ik_banned_regex_case_insensitive);
+            } catch {
+                if (typeof this.ik_banned_regex_case_insensitive === 'string') {
+                    return this.ik_banned_regex_case_insensitive.split('\n');
                 }
                 return undefined;
             }
@@ -1778,12 +1821,20 @@ export function createTextGenGenerationData(settings, model, finalPrompt = null,
         const tokenBans = toIntArray(banned_tokens);
         logitBiasArray.push(...tokenBans.map(x => [Number(x), false]));
         const sequenceBreakers = params.parseSequenceBreakers();
+        const ikBannedStrings = params.parseIkBannedStrings();
+        const ikBannedRegex = params.parseIkBannedRegex();
+        const ikBannedRegexCaseInsensitive = params.parseIkBannedRegexCaseInsensitive();
         const llamaCppParams = {
             'logit_bias': logitBiasArray,
             // Conflicts with ooba's grammar_string
             'grammar': settings.grammar_string,
             'cache_prompt': true,
             'dry_sequence_breakers': sequenceBreakers,
+            'tfs_z': params.tfs,
+            'banbuffer_size': params.ik_banbuffer_size,
+            'banned_strings': ikBannedStrings,
+            'banned_regex': ikBannedRegex,
+            'banned_regex_case_insensitive': ikBannedRegexCaseInsensitive,
         };
         params = Object.assign(params, llamaCppParams);
         if (!Array.isArray(sequenceBreakers) || sequenceBreakers.length === 0) {
