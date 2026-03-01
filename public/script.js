@@ -3230,6 +3230,8 @@ export function baseChatReplace(value, name1Override = null, name2Override = nul
  * @property {string} version Character version
  * @property {string} charDepthPrompt Character depth note
  * @property {string} creatorNotes Character creator notes
+ * @property {string} firstMessage Character first message / greeting
+ * @property {string[]} alternateGreetings Character alternate greetings
  */
 
 /**
@@ -3316,6 +3318,17 @@ export function getCharacterCardFieldsLazy({ chid = undefined } = {}) {
             const exampleDialog = chat_metadata.mes_example || character.mes_example || '';
             return baseChatReplace(exampleDialog.trim());
         },
+        firstMessage: () => {
+            if (!character) return '';
+            const firstMes = character.first_mes?.trim() || '';
+            return baseChatReplace(firstMes);
+        },
+        alternateGreetings: () => {
+            if (!character) return [];
+            const altGreetings = character.data?.alternate_greetings;
+            if (!Array.isArray(altGreetings)) return [];
+            return altGreetings.map(greeting => baseChatReplace(greeting?.trim()));
+        },
     };
 
     return createLazyFields(resolvers);
@@ -3342,6 +3355,8 @@ export function getCharacterCardFields({ chid = undefined } = {}) {
         version: lazy.version,
         charDepthPrompt: lazy.charDepthPrompt,
         creatorNotes: lazy.creatorNotes,
+        firstMessage: lazy.firstMessage,
+        alternateGreetings: lazy.alternateGreetings,
     };
 }
 
