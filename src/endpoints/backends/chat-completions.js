@@ -11,6 +11,7 @@ import {
     CHAT_COMPLETION_SOURCES,
     GEMINI_SAFETY,
     NANOGPT_REASONING_EFFORT_MAP,
+    OPENAI_FIXED_REASONING_EFFORT,
     OPENAI_REASONING_EFFORT_MAP,
     OPENAI_REASONING_EFFORT_MODELS,
     OPENAI_VERBOSITY_MODELS,
@@ -97,6 +98,7 @@ const cachingAtDepth = (() => {
     const value = getConfigValue('claude.cachingAtDepth', -1, 'number');
     return Number.isInteger(value) && value >= 0 ? value : -1;
 })();
+const enableAdaptiveThinking = getConfigValue('claude.enableAdaptiveThinking', true, 'boolean');
 
 /**
  * Cache for cacheable (writing) OpenRouter model IDs.
@@ -228,7 +230,7 @@ async function sendClaudeRequest(request, response) {
         const isLimitedSampling = /^claude-(opus-4-1|sonnet-4-5|haiku-4-5|opus-4-5|opus-4-6|sonnet-4-6)/.test(request.body.model);
         const useVerbosity = /^claude-(opus-4-5|opus-4-6|sonnet-4-6)/.test(request.body.model);
         const noPrefillModel = /^claude-(opus-4-6|sonnet-4-6)/.test(request.body.model);
-        const isAdaptiveModel = /^claude-(opus-4-6|sonnet-4-6)/.test(request.body.model);
+        const isAdaptiveModel = enableAdaptiveThinking && /^claude-(opus-4-6|sonnet-4-6)/.test(request.body.model);
         let fixThinkingPrefill = false;
         // Add custom stop sequences
         const stopSequences = [];
@@ -1596,7 +1598,7 @@ async function sendAzureOpenAIRequest(request, response) {
 
     // Do not send reasoning effort to models which do not support it
     apiRequestBody['reasoning_effort'] = OPENAI_REASONING_EFFORT_MODELS.includes(request.body.model)
-        ? OPENAI_REASONING_EFFORT_MAP[request.body.reasoning_effort] ?? request.body.reasoning_effort
+        ? OPENAI_FIXED_REASONING_EFFORT[request.body.model] ?? OPENAI_REASONING_EFFORT_MAP[request.body.reasoning_effort] ?? request.body.reasoning_effort
         : undefined;
 
     const controller = new AbortController();
@@ -2325,7 +2327,7 @@ router.post('/generate', async function (request, response) {
         // A few of OpenAIs reasoning models support reasoning effort
         if (request.body.reasoning_effort && [CHAT_COMPLETION_SOURCES.CUSTOM, CHAT_COMPLETION_SOURCES.OPENAI].includes(request.body.chat_completion_source)) {
             if (OPENAI_REASONING_EFFORT_MODELS.includes(request.body.model)) {
-                bodyParams['reasoning_effort'] = OPENAI_REASONING_EFFORT_MAP[request.body.reasoning_effort] ?? request.body.reasoning_effort;
+                bodyParams['reasoning_effort'] = OPENAI_FIXED_REASONING_EFFORT[request.body.model] ?? OPENAI_REASONING_EFFORT_MAP[request.body.reasoning_effort] ?? request.body.reasoning_effort;
             }
         }
 
