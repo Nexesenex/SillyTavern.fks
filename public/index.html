@@ -1509,7 +1509,25 @@
                                             <input class="neo-range-slider" type="range" id="ik_banbuffer_size_textgenerationwebui" min="0" max="8192" step="1" />
                                             <input class="neo-range-input" type="number" min="0" max="8192" step="1" data-for="ik_banbuffer_size_textgenerationwebui" id="ik_banbuffer_size_counter_textgenerationwebui">
                                         </div>
-
+                                        <div class="alignitemscenter justifyCenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                            <label class="checkbox_label alignItemsBaseline">
+                                                <input id="ik_saturate_predict" type="checkbox" />
+                                                <span>
+                                                    <span data-i18n="ik_Saturate predict">ik_Saturate predict</span>
+                                                    <small class="fa-solid fa-circle-info opacity50p" title="Ensure that sent tokens=predicted tokens"></small>
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <div data-tg-samplers="ik_rewind_count_max" class="alignItemsCenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0" data-tg-type="llamacpp, koboldcpp, tabby, aphrodite">
+                                            <small data-i18n="ik_Rewind count max">ik_Rewind count max</small>
+                                            <input class="neo-range-slider" type="range" id="ik_rewind_count_max_textgenerationwebui" min="-1" max="1000" step="1" />
+                                            <input class="neo-range-input" type="number" min="-1" max="1000" step="1" data-for="ik_rewind_count_max_textgenerationwebui" id="ik_rewind_count_max_counter_textgenerationwebui">
+                                        </div>
+                                        <div data-tg-samplers="ik_banned_n" class="alignItemsCenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0" data-tg-type="llamacpp, koboldcpp, tabby, aphrodite">
+                                            <small data-i18n="ik_Banned n">ik_Banned n</small>
+                                            <input class="neo-range-slider" type="range" id="ik_banned_n_textgenerationwebui" min="-1" max="100" step="1" />
+                                            <input class="neo-range-input" type="number" min="-1" max="100" step="1" data-for="ik_banned_n_textgenerationwebui" id="ik_banned_n_counter_textgenerationwebui">
+                                        </div>
                                         <div data-tg-samplers="ik_banned_strings" class="range-block marginTop5" title="Strings across which sequence is banned. Specified as a comma-separated list of quoted strings." data-i18n="[title]ik_banned_strings_desc">
                                             <div class="range-block-title textAlignCenter flex-container justifyCenter alignitemscenter">
                                                 <small data-i18n="ik_Banned Strings">ik_Banned Strings</small>
