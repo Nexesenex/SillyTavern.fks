@@ -70,13 +70,14 @@ import { hideChatMessageRange } from './chats.js';
 import { getContext, saveMetadataDebounced } from './extensions.js';
 import { getRegexedString, regex_placement } from './extensions/regex/engine.js';
 import { findGroupMemberId, groups, is_group_generating, openGroupById, regenerateGroup, resetSelectedGroup, saveGroupChat, selected_group, getGroupMembers } from './group-chats.js';
-import { chat_completion_sources, oai_settings, promptManager, ZAI_ENDPOINT } from './openai.js';
+import { chat_completion_sources, oai_settings, promptManager, SILICONFLOW_ENDPOINT, ZAI_ENDPOINT } from './openai.js';
 import { user_avatar } from './personas.js';
 import { addEphemeralStoppingString, chat_styles, context_presets, flushEphemeralStoppingStrings, playMessageSound, power_user } from './power-user.js';
 import { SERVER_INPUTS, textgen_types, textgenerationwebui_settings } from './textgen-settings.js';
 import { decodeTextTokens, getAvailableTokenizers, getFriendlyTokenizerName, getTextTokens, getTokenCountAsync, selectTokenizer } from './tokenizers.js';
 import { debounce, delay, equalsIgnoreCaseAndAccents, findChar, getCharIndex, isFalseBoolean, isTrueBoolean, onlyUnique, regexFromString, showFontAwesomePicker, stringToRange, trimToEndSentence, trimToStartSentence, waitUntilCondition } from './utils.js';
 import { registerVariableCommands, resolveVariable } from './variables.js';
+import { registerActionLoaderSlashCommands } from './action-loader-slashcommands.js';
 import { background_settings } from './backgrounds.js';
 import { SlashCommandClosure } from './slash-commands/SlashCommandClosure.js';
 import { SlashCommandClosureResult } from './slash-commands/SlashCommandClosureResult.js';
@@ -2549,6 +2550,16 @@ export function initDefaultSlashCommands() {
                 typeList: [ARGUMENT_TYPE.NUMBER],
             }),
             SlashCommandNamedArgument.fromProps({
+                name: 'placeholder',
+                description: t`placeholder text displayed in the input field when empty`,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+            SlashCommandNamedArgument.fromProps({
+                name: 'tooltip',
+                description: t`tooltip text shown when hovering over the input field`,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+            SlashCommandNamedArgument.fromProps({
                 name: 'onSuccess',
                 description: t`closure to execute when the ok button is clicked or the input is closed as successful (via Enter, etc)`,
                 typeList: [ARGUMENT_TYPE.CLOSURE],
@@ -2569,6 +2580,14 @@ export function initDefaultSlashCommands() {
         <div>
             ${t`Shows a popup with the provided text and an input field.`}
             ${t`The <code>default</code> argument is the default value of the input field, and the text argument is the text to display.`}
+        </div>
+        <div>
+            <strong>${t`Example:`}</strong>
+            <ul>
+                <li>
+                    <pre><code>/input default="John" placeholder="Enter your name" tooltip="Your display name" What is your name?</code></pre>
+                </li>
+            </ul>
         </div>
     `,
     }));
@@ -2681,7 +2700,7 @@ export function initDefaultSlashCommands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'popup',
         callback: popupCallback,
-        returns: t`popup text`,
+        returns: t`Popup text`,
         namedArgumentList: [
             SlashCommandNamedArgument.fromProps({
                 name: 'scroll',
@@ -2736,6 +2755,11 @@ export function initDefaultSlashCommands() {
                 enumList: commonEnumProviders.boolean('trueFalse')(),
                 defaultValue: 'false',
             }),
+            SlashCommandNamedArgument.fromProps({
+                name: 'tooltip',
+                description: t`tooltip text shown when hovering over the popup content area`,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
         ],
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
@@ -2769,7 +2793,7 @@ export function initDefaultSlashCommands() {
         namedArgumentList: [
             SlashCommandNamedArgument.fromProps({
                 name: 'labels',
-                description: t`button labels`,
+                description: t`button labels - can be an array of strings or objects with text, tooltip, and icon properties`,
                 typeList: [ARGUMENT_TYPE.LIST],
                 isRequired: true,
             }),
@@ -2794,10 +2818,16 @@ export function initDefaultSlashCommands() {
             ${t`Returns the clicked button label into the pipe or empty string if canceled.`}
         </div>
         <div>
+            ${t`Labels can be simple strings or objects with <code>text</code>, <code>tooltip</code>, and <code>icon</code> (Font Awesome class) properties.`}
+        </div>
+        <div>
             <strong>${t`Example:`}</strong>
             <ul>
                 <li>
                     <pre><code>/buttons labels=["Yes","No"] Do you want to continue?</code></pre>
+                </li>
+                <li>
+                    <pre><code>/buttons labels=[{"text":"Save","icon":"fa-floppy-disk","tooltip":"Save changes"},{"text":"Cancel"}] Choose an action</code></pre>
                 </li>
             </ul>
         </div>
@@ -3102,8 +3132,9 @@ export function initDefaultSlashCommands() {
                     new SlashCommandEnumValue('custom', 'custom OpenAI-compatible', enumTypes.getBasedOnIndex(UNIQUE_APIS.findIndex(x => x === 'openai')), 'O'),
                     new SlashCommandEnumValue('zai', 'Z.AI', enumTypes.getBasedOnIndex(UNIQUE_APIS.findIndex(x => x === 'zai')), 'Z'),
                     new SlashCommandEnumValue('vertexai', 'Google Vertex AI', enumTypes.getBasedOnIndex(UNIQUE_APIS.findIndex(x => x === 'vertexai')), 'V'),
+                    new SlashCommandEnumValue('siliconflow', 'SiliconFlow', enumTypes.getBasedOnIndex(UNIQUE_APIS.findIndex(x => x === 'siliconflow')), 'S'),
                     new SlashCommandEnumValue('kobold', 'KoboldAI Classic', enumTypes.getBasedOnIndex(UNIQUE_APIS.findIndex(x => x === 'kobold')), 'K'),
-                    ...Object.values(textgen_types).map(api => new SlashCommandEnumValue(api, null, enumTypes.getBasedOnIndex(UNIQUE_APIS.findIndex(x => x === 'textgenerationwebui')), 'T')),
+                    ...Object.values(textgen_types).filter(api => Object.keys(SERVER_INPUTS).includes(api)).map(api => new SlashCommandEnumValue(api, null, enumTypes.getBasedOnIndex(UNIQUE_APIS.findIndex(x => x === 'textgenerationwebui')), 'T')),
                 ],
             }),
             SlashCommandNamedArgument.fromProps({
@@ -3135,7 +3166,7 @@ export function initDefaultSlashCommands() {
                 ${t`If a manual API is provided to <b>set</b> the URL, make sure to set <code>connect=false</code>, as auto-connect only works for the currently selected API, or consider switching to it with <code>/api</code> first.`}
             </div>
             <div>
-                ${t`This slash command works for most of the Text Completion sources, KoboldAI Classic, and also Custom OpenAI compatible, Z.AI, and Google Vertex AI for the Chat Completion sources. If unsure which APIs are supported, check the auto-completion of the optional <code>api</code> argument of this command.`}
+                ${t`This slash command works for most of the Text Completion sources, KoboldAI Classic, and also Custom OpenAI compatible, Z.AI, SiliconFlow, and Google Vertex AI for the Chat Completion sources. If unsure which APIs are supported, check the auto-completion of the optional <code>api</code> argument of this command.`}
             </div>
         `,
     }));
@@ -3615,6 +3646,15 @@ export function initDefaultSlashCommands() {
         aliases: ['list-wrap'],
         returns: t`unnamed argument value wrapped into an array`,
         helpString: t`Wraps a single unnamed argument into an array if it's not already an array. If the value is an empty string, returns an empty array.`,
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'stringify',
+                description: t`Whether JSON primitives (numbers, booleans, nulls) should be treated as strings, i.e. ["null"] when stringify=true vs. [null] when stringify=false.`,
+                typeList: [ARGUMENT_TYPE.BOOLEAN],
+                defaultValue: 'true',
+                enumList: commonEnumProviders.boolean('trueFalse')(),
+            }),
+        ],
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
                 description: t`value`,
@@ -3623,7 +3663,7 @@ export function initDefaultSlashCommands() {
                 typeList: [ARGUMENT_TYPE.STRING, ARGUMENT_TYPE.DICTIONARY, ARGUMENT_TYPE.BOOLEAN, ARGUMENT_TYPE.NUMBER, ARGUMENT_TYPE.LIST],
             }),
         ],
-        callback: (_args, value) => {
+        callback: (args, value) => {
             // Closures are not supported
             if (value instanceof SlashCommandClosure) {
                 throw new SlashCommandExecutionError(t`Closures are not supported as unnamed arguments for /array-wrap. Did you forget to call the closure with parentheses?`);
@@ -3650,6 +3690,12 @@ export function initDefaultSlashCommands() {
 
                 // If it's an object, wrap it into an array and stringify
                 if (typeof parsedValue === 'object' && parsedValue !== null) {
+                    return JSON.stringify([parsedValue]);
+                }
+
+                // For primitive values, check if we should take the parsed or original value based on the stringify argument
+                const isJsonPrimitive = parsedValue === null || ['string', 'number', 'boolean'].includes(typeof parsedValue);
+                if (isJsonPrimitive && isFalseBoolean(String(args?.stringify?.toString()))) {
                     return JSON.stringify([parsedValue]);
                 }
 
@@ -3714,6 +3760,7 @@ export function initDefaultSlashCommands() {
     }));
 
     registerVariableCommands();
+    registerActionLoaderSlashCommands();
 }
 
 const NARRATOR_NAME_KEY = 'narrator_name';
@@ -3951,10 +3998,15 @@ async function trimTokensCallback(arg, value) {
 }
 
 /**
- * Displays a popup with buttons based on provided labels and handles button interactions.
- *
+ * @typedef {object} ButtonLabel
+ * @property {string} text - The button text
+ * @property {string} [tooltip] - Optional tooltip text
+ * @property {string} [icon] - Optional Font Awesome icon class (e.g., 'fa-floppy-disk')
+ */
+
+/**
  * @param {object} args - Named arguments for the command
- * @param {string} args.labels - JSON string of an array of button labels
+ * @param {string} args.labels - JSON string of an array of button labels (strings or ButtonLabel objects)
  * @param {string} [args.multiple=false] - Flag indicating if multiple buttons can be toggled
  * @param {string} text - The text content to be displayed within the popup
  *
@@ -3964,11 +4016,21 @@ async function trimTokensCallback(arg, value) {
  */
 async function buttonsCallback(args, text) {
     try {
-        /** @type {string[]} */
-        const buttons = JSON.parse(resolveVariable(args?.labels));
+        /** @type {(string|ButtonLabel)[]} */
+        const rawButtons = JSON.parse(resolveVariable(args?.labels));
 
-        if (!Array.isArray(buttons) || !buttons.length) {
+        if (!Array.isArray(rawButtons) || !rawButtons.length) {
             console.warn('WARN: Invalid labels provided for /buttons command');
+            return '';
+        }
+
+        // Normalize buttons to ButtonLabel format for consistent handling
+        /** @type {ButtonLabel[]} */
+        const buttons = rawButtons.map(btn => typeof btn === 'string' ? { text: btn } : btn);
+
+        // Validate raw buttons: each entry must be a string or a non-null object with a string `text` field that has content
+        if (!buttons.every(btn => typeof btn === 'object' && btn !== null && typeof btn.text === 'string' && btn.text)) {
+            console.warn('WARN: Invalid button label entry provided for /buttons command: each entry must be a string or an object with a "text" property');
             return '';
         }
 
@@ -3977,6 +4039,7 @@ async function buttonsCallback(args, text) {
         const multiple = isTrueBoolean(args?.multiple);
 
         // Map custom buttons to results. Start at 2 because 1 and 0 are reserved for ok and cancel
+        /** @type {Map<number, ButtonLabel>} */
         const resultToButtonMap = new Map(buttons.map((button, index) => [index + 2, button]));
 
         return new Promise(async (resolve) => {
@@ -4011,7 +4074,25 @@ async function buttonsCallback(args, text) {
                     buttonElement.dataset.result = String(result);
                 }
 
-                buttonElement.innerText = button;
+                // Add icon if provided
+                if (button.icon) {
+                    const icon = document.createElement('i');
+                    icon.className = `fa-solid ${button.icon}`;
+                    icon.style.marginRight = '0.5em';
+                    buttonElement.appendChild(icon);
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = button.text;
+                    buttonElement.appendChild(textSpan);
+                } else {
+                    buttonElement.innerText = button.text;
+                }
+
+                // Add tooltip if provided
+                if (button.tooltip) {
+                    buttonElement.title = button.tooltip;
+                    buttonElement.dataset.i18n = '[title]' + button.tooltip;
+                }
+
                 buttonContainer.appendChild(buttonElement);
             }
 
@@ -4034,10 +4115,10 @@ async function buttonsCallback(args, text) {
             /** @returns {string} @param {string|number|boolean} result */
             function getResult(result) {
                 if (multiple) {
-                    const array = result === POPUP_RESULT.AFFIRMATIVE ? Array.from(multipleToggledState).map(r => resultToButtonMap.get(r) ?? '') : [];
+                    const array = result === POPUP_RESULT.AFFIRMATIVE ? Array.from(multipleToggledState).map(r => resultToButtonMap.get(r)?.text ?? '') : [];
                     return JSON.stringify(array);
                 }
-                return typeof result === 'number' ? resultToButtonMap.get(result) ?? '' : '';
+                return typeof result === 'number' ? resultToButtonMap.get(result)?.text ?? '' : '';
             }
         });
     } catch {
@@ -4059,6 +4140,7 @@ async function popupCallback(args, value) {
         transparent: isTrueBoolean(args?.transparent),
         okButton: args?.okButton !== undefined && typeof args?.okButton === 'string' ? args.okButton : t`OK`,
         cancelButton: args?.cancelButton !== undefined && typeof args?.cancelButton === 'string' ? args.cancelButton : null,
+        tooltip: args?.tooltip !== undefined && typeof args?.tooltip === 'string' ? args.tooltip : null,
     };
     const result = await Popup.show.text(safeHeader, safeBody, popupOptions);
     return String(requestedResult ? result ?? '' : value);
@@ -4214,6 +4296,8 @@ async function inputCallback(args, prompt) {
         wide: isTrueBoolean(args?.wide),
         okButton: args?.okButton !== undefined && typeof args?.okButton === 'string' ? args.okButton : t`Ok`,
         rows: args?.rows !== undefined && typeof args?.rows === 'string' ? isNaN(Number(args.rows)) ? 4 : Number(args.rows) : 4,
+        placeholder: args?.placeholder !== undefined && typeof args?.placeholder === 'string' ? args.placeholder : null,
+        tooltip: args?.tooltip !== undefined && typeof args?.tooltip === 'string' ? args.tooltip : null,
     };
     // Do not remove this delay, otherwise the prompt will not show up
     await delay(1);
@@ -4466,7 +4550,7 @@ async function echoCallback(args, value) {
     if (args.timeout && !isNaN(parseInt(args.timeout))) options.timeOut = parseInt(args.timeout);
     if (args.extendedTimeout && !isNaN(parseInt(args.extendedTimeout))) options.extendedTimeOut = parseInt(args.extendedTimeout);
     if (isTrueBoolean(args.preventDuplicates)) options.preventDuplicates = true;
-    if (args.cssClass) options.toastClass = args.cssClass;
+    if (args.cssClass) options.toastClass = [options.toastClass, args.cssClass].filter(Boolean).join(' ');
     options.escapeHtml = args.escapeHtml !== undefined ? isTrueBoolean(args.escapeHtml) : true;
 
     // Prepare possible await handling
@@ -6630,6 +6714,32 @@ async function setApiUrlCallback({ api = null, connect = 'true', quiet = 'false'
         }
 
         return oai_settings.zai_endpoint || ZAI_ENDPOINT.COMMON;
+    }
+
+    const isCurrentlySiliconFlow = main_api === 'openai' && oai_settings.chat_completion_source === chat_completion_sources.SILICONFLOW;
+    if (api === chat_completion_sources.SILICONFLOW || (!api && isCurrentlySiliconFlow)) {
+        if (!url) {
+            return oai_settings.siliconflow_endpoint || SILICONFLOW_ENDPOINT.GLOBAL;
+        }
+
+        const permittedValues = Object.values(SILICONFLOW_ENDPOINT);
+        if (!permittedValues.includes(url)) {
+            !isQuiet && toastr.warning(t`Valid options are: ${permittedValues.join(', ')}`, t`SiliconFlow endpoint '${url}' is not a valid option.`);
+            return '';
+        }
+
+        if (!isCurrentlySiliconFlow && autoConnect) {
+            toastr.warning(t`SiliconFlow is not the currently selected API, so we cannot do an auto-connect. Consider switching to it via /api beforehand.`);
+            return '';
+        }
+
+        $('#siliconflow_endpoint').val(url).trigger('input');
+
+        if (autoConnect) {
+            $('#api_button_openai').trigger('click');
+        }
+
+        return oai_settings.siliconflow_endpoint || SILICONFLOW_ENDPOINT.GLOBAL;
     }
 
     const isCurrentlyVertexAI = main_api === 'openai' && oai_settings.chat_completion_source === chat_completion_sources.VERTEXAI;
