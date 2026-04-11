@@ -122,6 +122,59 @@ const cachedSummaries = new Map();
 const vectorApiRequiresUrl = ['llamacpp', 'vllm', 'ollama', 'koboldcpp'];
 
 /**
+ * @typedef {object} RemoteEmbeddingEndpointConfig
+ * @property {string} url - The API endpoint URL
+ * @property {string} settingsKey - The key in settings for the selected model
+ * @property {string} selectId - The ID of the select element (without #)
+ * @property {string} [valueProperty='id'] - Property name for the option value
+ * @property {string} [textProperty] - Property name for the option text. Falls back to valueProperty
+ * @property {() => object} [getBody] - Function returning the request body
+ * @property {(models: any[]) => any[]} [filter] - Optional post-fetch filter for models
+ */
+
+/** @type {Record<string, RemoteEmbeddingEndpointConfig>} */
+const remoteEmbeddingEndpoints = {
+    chutes: {
+        url: '/api/openai/chutes/models/embedding',
+        settingsKey: 'chutes_model',
+        selectId: 'vectors_chutes_model',
+        valueProperty: 'slug',
+        textProperty: 'name',
+    },
+    nanogpt: {
+        url: '/api/openai/nanogpt/models/embedding',
+        settingsKey: 'nanogpt_model',
+        selectId: 'vectors_nanogpt_model',
+        textProperty: 'name',
+    },
+    electronhub: {
+        url: '/api/openai/electronhub/models',
+        settingsKey: 'electronhub_model',
+        selectId: 'vectors_electronhub_model',
+        textProperty: 'name',
+        filter: models => models.filter(m => Array.isArray(m?.endpoints) && m.endpoints.includes('/v1/embeddings')),
+    },
+    openrouter: {
+        url: '/api/openrouter/models/embedding',
+        settingsKey: 'openrouter_model',
+        selectId: 'vectors_openrouter_model',
+        textProperty: 'name',
+    },
+    siliconflow: {
+        url: '/api/openai/siliconflow/models/embedding',
+        settingsKey: 'siliconflow_model',
+        selectId: 'vectors_siliconflow_model',
+        getBody: () => ({ siliconflow_endpoint: oai_settings.siliconflow_endpoint }),
+    },
+    workers_ai: {
+        url: '/api/openai/workers-ai/models/embedding',
+        settingsKey: 'workers_ai_model',
+        selectId: 'vectors_workers_ai_model',
+        getBody: () => ({ workers_ai_account_id: oai_settings.workers_ai_account_id }),
+    },
+};
+
+/**
  * Gets the Collection ID for a file embedded in the chat.
  * @param {string} fileUrl URL of the file
  * @returns {string} Collection ID
@@ -389,6 +442,8 @@ async function synchronizeChat(batchSize = 5) {
                     return 'Extras API must provide an "embeddings" module.';
                 case 'webllm_not_supported':
                     return 'WebLLM extension is not installed or the model is not set.';
+                case 'account_id_missing':
+                    return 'Workers AI account ID is required. Save it in the "API Connections" panel.';
                 default:
                     return 'Check server console for more details';
             }
@@ -843,6 +898,10 @@ function getVectorsRequestBody(args = {}) {
             body.model = extension_settings.vectors.siliconflow_model;
             body.siliconflow_endpoint = oai_settings.siliconflow_endpoint;
             break;
+        case 'workers_ai':
+            body.model = extension_settings.vectors.workers_ai_model || '@cf/baai/bge-m3';
+            body.workers_ai_account_id = oai_settings.workers_ai_account_id;
+            break;
         default:
             break;
     }
@@ -936,6 +995,7 @@ function throwIfSourceInvalid() {
         settings.source === 'togetherai' && !secret_state[SECRET_KEYS.TOGETHERAI] ||
         settings.source === 'nomicai' && !secret_state[SECRET_KEYS.NOMICAI] ||
         settings.source === 'cohere' && !secret_state[SECRET_KEYS.COHERE] ||
+        settings.source === 'workers_ai' && !secret_state[SECRET_KEYS.WORKERS_AI] ||
         settings.source === 'siliconflow' && !secret_state[SECRET_KEYS.SILICONFLOW]) {
         throw new Error('Vectors: API key missing', { cause: 'api_key_missing' });
     }
@@ -963,6 +1023,10 @@ function throwIfSourceInvalid() {
 
     if (settings.source === 'webllm' && (!isWebLlmSupported() || !settings.webllm_model)) {
         throw new Error('Vectors: WebLLM is not supported', { cause: 'webllm_not_supported' });
+    }
+
+    if (settings.source === 'workers_ai' && !oai_settings.workers_ai_account_id) {
+        throw new Error('Vectors: Workers AI account ID missing', { cause: 'account_id_missing' });
     }
 }
 
@@ -1155,211 +1219,77 @@ function toggleSettings() {
     $('#koboldcpp_vectorsModel').toggle(settings.source === 'koboldcpp');
     $('#google_vectorsModel').toggle(settings.source === 'palm' || settings.source === 'vertexai');
     $('#siliconflow_vectorsModel').toggle(settings.source === 'siliconflow');
+    $('#workers_ai_vectorsModel').toggle(settings.source === 'workers_ai');
     $('#vector_altEndpointUrl').toggle(vectorApiRequiresUrl.includes(settings.source));
-    switch (settings.source) {
-        case 'webllm':
-            loadWebLlmModels();
-            break;
-        case 'electronhub':
-            loadElectronHubModels();
-            break;
-        case 'openrouter':
-            loadOpenRouterModels();
-            break;
-        case 'chutes':
-            loadChutesModels();
-            break;
-        case 'nanogpt':
-            loadNanoGPTModels();
-            break;
-        case 'siliconflow':
-            loadSiliconFlowModels();
-            break;
-    }
-}
-
-async function loadChutesModels() {
-    try {
-        const response = await fetch('/api/openai/chutes/models/embedding', {
-            method: 'POST',
-            headers: getRequestHeaders({ omitContentType: true }),
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        /** @type {Array<any>} */
-        const data = await response.json();
-        const models = Array.isArray(data) ? data : [];
-        populateChutesModelSelect(models);
-    } catch (err) {
-        console.warn('Chutes models fetch failed', err);
-        populateChutesModelSelect([]);
-    }
-}
-
-function populateChutesModelSelect(models) {
-    const select = $('#vectors_chutes_model');
-    select.empty();
-    for (const m of models) {
-        const option = document.createElement('option');
-        option.value = m.slug;
-        option.text = m.name;
-        select.append(option);
-    }
-    if (!settings.chutes_model && models.length) {
-        settings.chutes_model = models[0].slug;
-    }
-    $('#vectors_chutes_model').val(settings.chutes_model);
-}
-
-async function loadNanoGPTModels() {
-    try {
-        const response = await fetch('/api/openai/nanogpt/models/embedding', {
-            method: 'POST',
-            headers: getRequestHeaders({ omitContentType: true }),
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        /** @type {Array<any>} */
-        const data = await response.json();
-        const models = Array.isArray(data) ? data : [];
-        populateNanoGPTModelSelect(models);
-    } catch (err) {
-        console.warn('NanoGPT models fetch failed', err);
-        populateNanoGPTModelSelect([]);
-    }
-}
-
-function populateNanoGPTModelSelect(models) {
-    const select = $('#vectors_nanogpt_model');
-    select.empty();
-    for (const m of models) {
-        const option = document.createElement('option');
-        option.value = m.id;
-        option.text = m.name || m.id;
-        select.append(option);
-    }
-    if (!settings.nanogpt_model && models.length) {
-        settings.nanogpt_model = models[0].id;
-    }
-    $('#vectors_nanogpt_model').val(settings.nanogpt_model);
-}
-
-async function loadElectronHubModels() {
-    try {
-        const response = await fetch('/api/openai/electronhub/models', {
-            method: 'POST',
-            headers: getRequestHeaders({ omitContentType: true }),
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        /** @type {Array<any>} */
-        const data = await response.json();
-        // filter by embeddings endpoint
-        const models = Array.isArray(data) ? data.filter(m => Array.isArray(m?.endpoints) && m.endpoints.includes('/v1/embeddings')) : [];
-        populateElectronHubModelSelect(models);
-    } catch (err) {
-        console.warn('Electron Hub models fetch failed', err);
-        populateElectronHubModelSelect([]);
+    if (settings.source === 'webllm') {
+        loadWebLlmModels();
+    } else if (settings.source in remoteEmbeddingEndpoints) {
+        loadRemoteEmbeddingModels(settings.source);
     }
 }
 
 /**
- * Populates the Electron Hub model select element.
- * @param {{ id: string, name: string }[]} models Electron Hub models
+ * Loads models from a remote embedding endpoint and populates the corresponding select element.
+ * @param {string} source - The source key matching a remoteEmbeddingEndpoints entry
  */
-function populateElectronHubModelSelect(models) {
-    const select = $('#vectors_electronhub_model');
-    select.empty();
-    for (const m of models) {
-        const option = document.createElement('option');
-        option.value = m.id;
-        option.text = m.name || m.id;
-        select.append(option);
+async function loadRemoteEmbeddingModels(source) {
+    const config = remoteEmbeddingEndpoints[source];
+    if (!config) {
+        return;
     }
-    if (!settings.electronhub_model && models.length) {
-        settings.electronhub_model = models[0].id;
-    }
-    $('#vectors_electronhub_model').val(settings.electronhub_model);
-}
 
-async function loadOpenRouterModels() {
-    try {
-        const response = await fetch('/api/openrouter/models/embedding', {
-            method: 'POST',
-            headers: getRequestHeaders({ omitContentType: true }),
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+    const { url, settingsKey, selectId, getBody, filter } = config;
+    const valueProperty = config.valueProperty || 'id';
+    const textProperty = config.textProperty;
+
+    /**
+     * Populates the select element with the given models.
+     * @param {any[]} models - Array of model objects
+     */
+    function populateSelect(models) {
+        const select = $(`#${selectId}`);
+        select.empty();
+        for (const m of models) {
+            const option = document.createElement('option');
+            option.value = m[valueProperty];
+            option.text = textProperty ? (m[textProperty] || m[valueProperty]) : m[valueProperty];
+            select.append(option);
         }
-        /** @type {Array<any>} */
-        const data = await response.json();
-        const models = Array.isArray(data) ? data : [];
-        populateOpenRouterModelSelect(models);
-    } catch (err) {
-        console.warn('OpenRouter models fetch failed', err);
-        populateOpenRouterModelSelect([]);
+        if (!settings[settingsKey] && models.length) {
+            settings[settingsKey] = models[0][valueProperty];
+            Object.assign(extension_settings.vectors, settings);
+            saveSettingsDebounced();
+        }
+        select.val(settings[settingsKey]);
     }
-}
 
-/**
- * Populates the OpenRouter model select element.
- * @param {{ id: string, name: string }[]} models OpenRouter models
- */
-function populateOpenRouterModelSelect(models) {
-    const select = $('#vectors_openrouter_model');
-    select.empty();
-    for (const m of models) {
-        const option = document.createElement('option');
-        option.value = m.id;
-        option.text = m.name || m.id;
-        select.append(option);
-    }
-    if (!settings.openrouter_model && models.length) {
-        settings.openrouter_model = models[0].id;
-    }
-    $('#vectors_openrouter_model').val(settings.openrouter_model);
-}
-
-async function loadSiliconFlowModels() {
     try {
-        const response = await fetch('/api/openai/siliconflow/models/embedding', {
+        const body = typeof getBody === 'function' ? getBody() : {};
+
+        /** @type {RequestInit} */
+        const fetchOptions = {
             method: 'POST',
             headers: getRequestHeaders(),
-            body: JSON.stringify({
-                siliconflow_endpoint: oai_settings.siliconflow_endpoint,
-            }),
-        });
+            body: JSON.stringify(body || {}),
+        };
 
+        const response = await fetch(url, fetchOptions);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
 
         /** @type {Array<any>} */
         const data = await response.json();
-        const models = Array.isArray(data) ? data : [];
-        populateSiliconFlowModelSelect(models);
-    } catch (err) {
-        console.warn('SiliconFlow models fetch failed', err);
-        populateSiliconFlowModelSelect([]);
-    }
-}
+        let models = Array.isArray(data) ? data : [];
+        if (filter) {
+            models = filter(models);
+        }
 
-function populateSiliconFlowModelSelect(models) {
-    const select = $('#vectors_siliconflow_model');
-    select.empty();
-    for (const m of models) {
-        const option = document.createElement('option');
-        option.value = m.id;
-        option.text = m.id;
-        select.append(option);
+        populateSelect(models);
+    } catch (err) {
+        console.warn(`${source} models fetch failed`, err);
+        populateSelect([]);
     }
-    if (!settings.siliconflow_model && models.length) {
-        settings.siliconflow_model = models[0].id;
-    }
-    $('#vectors_siliconflow_model').val(settings.siliconflow_model);
 }
 
 /**
@@ -1706,7 +1636,7 @@ async function activateWorldInfo(chat) {
     await eventSource.emit(event_types.WORLDINFO_FORCE_ACTIVATE, activatedEntries);
 }
 
-jQuery(async () => {
+export async function init() {
     if (!extension_settings.vectors) {
         extension_settings.vectors = settings;
     }
@@ -1782,6 +1712,11 @@ jQuery(async () => {
     });
     $('#vectors_siliconflow_model').val(settings.siliconflow_model).on('change', () => {
         settings.siliconflow_model = String($('#vectors_siliconflow_model').val());
+        Object.assign(extension_settings.vectors, settings);
+        saveSettingsDebounced();
+    });
+    $('#vectors_workers_ai_model').val(settings.workers_ai_model).on('change', () => {
+        settings.workers_ai_model = String($('#vectors_workers_ai_model').val());
         Object.assign(extension_settings.vectors, settings);
         saveSettingsDebounced();
     });
@@ -2317,4 +2252,4 @@ jQuery(async () => {
         }
         await purgeAllVectorIndexes();
     });
-});
+}
