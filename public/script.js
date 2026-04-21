@@ -717,6 +717,7 @@ async function firstLoadInit() {
     initLoaderOverlay.appendChild(splashMessage);
 
     const initLoaderHandle = loader.show({
+        slug: 'app-init',
         toastMode: loader.ToastMode.NONE,
         overlayContent: initLoaderOverlay,
     });
@@ -4470,18 +4471,24 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     for (let i = coreChat.length - 1; i >= 0; i--) {
         const depth = coreChat.length - i - (isContinue ? 2 : 1);
         const isPrefix = isContinue && i === coreChat.length - 1;
+
+        // In group chats, only include reasoning from the currently generating character
+        const isOtherGroupMember = selected_group && coreChat[i].name !== name2;
+
         coreChat[i] = {
             ...coreChat[i],
-            mes: promptReasoning.addToMessage(
-                coreChat[i].mes,
-                getRegexedString(
-                    String(coreChat[i].extra?.reasoning ?? ''),
-                    regex_placement.REASONING,
-                    { isPrompt: true, depth: depth },
+            mes: isOtherGroupMember
+                ? coreChat[i].mes
+                : promptReasoning.addToMessage(
+                    coreChat[i].mes,
+                    getRegexedString(
+                        String(coreChat[i].extra?.reasoning ?? ''),
+                        regex_placement.REASONING,
+                        { isPrompt: true, depth: depth },
+                    ),
+                    isPrefix,
+                    coreChat[i].extra?.reasoning_duration,
                 ),
-                isPrefix,
-                coreChat[i].extra?.reasoning_duration,
-            ),
         };
         if (promptReasoning.isLimitReached()) {
             break;
@@ -10586,6 +10593,7 @@ export async function renameGroupOrCharacterChat({ characterId, groupId, oldFile
     }
 
     const loaderHandle = showLoader ? loader.show({
+        slug: 'chat-rename',
         title: t`Rename Chat`,
         message: t`Renaming chat…`,
         toastMode: loader.ToastMode.STATIC,
@@ -11190,6 +11198,7 @@ jQuery(async function () {
         $('#select_chat_cross').trigger('click');
 
         const loaderHandle = loader.show({
+            slug: 'chat-delete',
             title: t`Delete Chat`,
             message: t`Deleting chat…`,
             toastMode: loader.ToastMode.STATIC,
@@ -12484,7 +12493,9 @@ jQuery(async function () {
         $('#avatar-and-name-block').slideToggle();
     });
 
-    $(document).on('mouseup touchend', '#show_more_messages', async function () {
+    $(document).on('click', '#show_more_messages', async function (event) {
+        event.stopPropagation();
+        event.preventDefault();
         await showMoreMessages();
     });
 
